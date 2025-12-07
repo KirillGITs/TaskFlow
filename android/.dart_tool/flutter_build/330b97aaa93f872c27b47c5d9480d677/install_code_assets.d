@@ -1,1 +1,0 @@
- C:\\Users\\Kirill\\FlutterProjects\\smart_buy\\android\\.dart_tool\\flutter_build\\330b97aaa93f872c27b47c5d9480d677\\native_assets.json: 

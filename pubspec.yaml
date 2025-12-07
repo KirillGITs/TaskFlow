@@ -1,0 +1,27 @@
+name: smart_buy
+description: "TaskFlow - Aplikacja do zarządzania zadaniami i nawykami"
+publish_to: 'none'
+
+version: 2.1.0+2
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.2
+  shared_preferences: ^2.2.2
+  intl: any
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true

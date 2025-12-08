@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
 
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
@@ -32,13 +34,15 @@ class CustomCategory {
         'color': color.value,
       };
 
-  factory CustomCategory.fromMap(Map<String, dynamic> map) => CustomCategory(
-        id: map['id']?.toString(),
-        name: map['name']?.toString() ?? '',
-        icon: IconData(map['icon'] ?? Icons.label.codePoint,
-            fontFamily: 'MaterialIcons'),
-        color: Color(map['color'] ?? Colors.blue.value),
-      );
+  factory CustomCategory.fromMap(Map<String, dynamic> map) {
+    final iconCodePoint = map['icon'] as int? ?? Icons.label.codePoint;
+    return CustomCategory(
+      id: map['id']?.toString(),
+      name: map['name']?.toString() ?? '',
+      icon: IconData(iconCodePoint, fontFamily: 'MaterialIcons'),
+      color: Color(map['color'] as int? ?? Colors.blue.value),
+    );
+  }
 }
 
 class AppLocalizations {
@@ -47,7 +51,8 @@ class AppLocalizations {
   AppLocalizations(this.languageCode);
 
   static AppLocalizations of(BuildContext context) {
-    final localizations = Localizations.of<AppLocalizations>(context, AppLocalizations);
+    final localizations =
+        Localizations.of<AppLocalizations>(context, AppLocalizations);
     if (localizations == null) {
       // Fallback to Polish if localizations not ready yet
       return AppLocalizations('pl');
@@ -867,7 +872,7 @@ class _TaskManagerAppState extends State<TaskManagerApp> {
         colorScheme: ColorScheme.fromSeed(
             seedColor: const Color(0xFF0E9F6E), brightness: Brightness.light),
         useMaterial3: true,
-        textTheme: Theme.of(context).textTheme.apply(fontFamily: 'Montserrat'),
+        fontFamily: 'Montserrat',
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white.withAlpha((255 * 0.6).round()),
@@ -883,12 +888,60 @@ class _TaskManagerAppState extends State<TaskManagerApp> {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
         appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
+        datePickerTheme: DatePickerThemeData(
+          headerBackgroundColor: const Color(0xFF0E9F6E),
+          headerForegroundColor: Colors.white,
+          dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return Colors.white;
+            }
+            if (states.contains(WidgetState.disabled)) {
+              return Colors.grey.shade400;
+            }
+            return Colors.black87;
+          }),
+          todayForegroundColor:
+              WidgetStateProperty.all(const Color(0xFF0E9F6E)),
+          dayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const Color(0xFF0E9F6E);
+            }
+            return Colors.transparent;
+          }),
+        ),
+        timePickerTheme: TimePickerThemeData(
+          dialHandColor: const Color(0xFF0E9F6E),
+          hourMinuteColor: WidgetStateColor.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const Color(0xFF0E9F6E);
+            }
+            return Colors.grey.shade200;
+          }),
+          hourMinuteTextColor: WidgetStateColor.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return Colors.white;
+            }
+            return Colors.black87;
+          }),
+          dayPeriodColor: WidgetStateColor.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const Color(0xFF0E9F6E);
+            }
+            return Colors.grey.shade200;
+          }),
+          dayPeriodTextColor: WidgetStateColor.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return Colors.white;
+            }
+            return Colors.black87;
+          }),
+        ),
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
             seedColor: const Color(0xFF0E9F6E), brightness: Brightness.dark),
         useMaterial3: true,
-        textTheme: Theme.of(context).textTheme.apply(fontFamily: 'Montserrat'),
+        fontFamily: 'Montserrat',
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white.withAlpha((255 * 0.06).round()),
@@ -905,6 +958,102 @@ class _TaskManagerAppState extends State<TaskManagerApp> {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
         appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
+        datePickerTheme: DatePickerThemeData(
+          backgroundColor: const Color(0xFF1F2937),
+          surfaceTintColor: Colors.transparent,
+          headerBackgroundColor: const Color(0xFF0E9F6E),
+          headerForegroundColor: Colors.white,
+          weekdayStyle: const TextStyle(color: Colors.white70),
+          dayStyle: const TextStyle(color: Colors.white),
+          dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) {
+              return Colors.white38;
+            }
+            if (states.contains(WidgetState.selected)) {
+              return Colors.white;
+            }
+            return Colors.white;
+          }),
+          todayForegroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return Colors.white;
+            }
+            return const Color(0xFF0E9F6E);
+          }),
+          todayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const Color(0xFF0E9F6E);
+            }
+            return Colors.transparent;
+          }),
+          todayBorder: const BorderSide(color: Color(0xFF0E9F6E), width: 1),
+          dayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const Color(0xFF0E9F6E);
+            }
+            return Colors.transparent;
+          }),
+          yearStyle: const TextStyle(color: Colors.white),
+          yearForegroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return Colors.white;
+            }
+            return Colors.white;
+          }),
+          yearBackgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const Color(0xFF0E9F6E);
+            }
+            return Colors.transparent;
+          }),
+          dayOverlayColor: WidgetStateProperty.all(
+            const Color(0xFF0E9F6E).withAlpha((255 * 0.2).round()),
+          ),
+          yearOverlayColor: WidgetStateProperty.all(
+            const Color(0xFF0E9F6E).withAlpha((255 * 0.2).round()),
+          ),
+        ),
+        timePickerTheme: TimePickerThemeData(
+          backgroundColor: const Color(0xFF1F2937),
+          dialBackgroundColor: const Color(0xFF374151),
+          dialHandColor: const Color(0xFF0E9F6E),
+          dialTextColor: WidgetStateColor.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return Colors.white;
+            }
+            return Colors.white;
+          }),
+          dialTextStyle: const TextStyle(color: Colors.white, fontSize: 16),
+          hourMinuteTextStyle: const TextStyle(
+              color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+          dayPeriodTextStyle:
+              const TextStyle(color: Colors.white, fontSize: 14),
+          helpTextStyle: const TextStyle(color: Colors.white70),
+          hourMinuteColor: WidgetStateColor.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const Color(0xFF0E9F6E);
+            }
+            return const Color(0xFF374151);
+          }),
+          hourMinuteTextColor: WidgetStateColor.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return Colors.white;
+            }
+            return Colors.white;
+          }),
+          dayPeriodColor: WidgetStateColor.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const Color(0xFF0E9F6E);
+            }
+            return const Color(0xFF374151);
+          }),
+          dayPeriodTextColor: WidgetStateColor.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return Colors.white;
+            }
+            return Colors.white;
+          }),
+        ),
       ),
       localizationsDelegates: const [
         AppLocalizationsDelegate(),
@@ -950,6 +1099,7 @@ class _TaskListPageState extends State<TaskListPage>
   final TextEditingController _priorityCtrl = TextEditingController();
   final TextEditingController _notesCtrl = TextEditingController();
   final TextEditingController _imageCtrl = TextEditingController();
+  String? _selectedImageBase64;
   TaskCategory _selectedCategory = TaskCategory.other;
   DateTime? _selectedReminder;
   bool _favorite = false;
@@ -960,7 +1110,7 @@ class _TaskListPageState extends State<TaskListPage>
   final List<CustomCategory> _customCategories = [];
   String _search = '';
   late TabController _tabController;
-  
+
   // Calendar state
   DateTime _calendarMonth = DateTime.now();
   DateTime? _selectedDay;
@@ -969,6 +1119,10 @@ class _TaskListPageState extends State<TaskListPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      // Оновлюємо UI коли змінюється вкладка
+      setState(() {});
+    });
     _loadData();
   }
 
@@ -1067,11 +1221,30 @@ class _TaskListPageState extends State<TaskListPage>
     await prefs.setStringList('custom_categories', categoriesRaw);
   }
 
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 85,
+    );
+
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      setState(() {
+        _selectedImageBase64 = base64Encode(bytes);
+        _imageCtrl.clear(); // Очищуємо URL якщо було
+      });
+    }
+  }
+
   void _resetDialogFields() {
     _nameCtrl.clear();
     _priorityCtrl.clear();
     _notesCtrl.clear();
     _imageCtrl.clear();
+    _selectedImageBase64 = null;
     _selectedCategory = TaskCategory.other;
     _selectedReminder = null;
     _favorite = false;
@@ -1092,8 +1265,8 @@ class _TaskListPageState extends State<TaskListPage>
               ? null
               : _priorityCtrl.text.trim(),
           notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-          imageUrl:
-              _imageCtrl.text.trim().isEmpty ? null : _imageCtrl.text.trim(),
+          imageUrl: _selectedImageBase64 ??
+              (_imageCtrl.text.trim().isEmpty ? null : _imageCtrl.text.trim()),
           reminderAt: _selectedReminder,
         ),
       );
@@ -1157,16 +1330,87 @@ class _TaskListPageState extends State<TaskListPage>
 
   Future<void> _pickReminder() async {
     final now = DateTime.now();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final date = await showDatePicker(
       context: context,
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
       initialDate: _selectedReminder ?? now,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: isDark
+                ? const ColorScheme.dark(
+                    primary: Color(0xFF0E9F6E),
+                    onPrimary: Colors.white,
+                    surface: Color(0xFF1F2937),
+                    onSurface: Colors.white,
+                  )
+                : const ColorScheme.light(
+                    primary: Color(0xFF0E9F6E),
+                    onPrimary: Colors.white,
+                    surface: Colors.white,
+                    onSurface: Colors.black87,
+                  ),
+            textTheme: TextTheme(
+              bodyLarge: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87, inherit: true),
+              bodyMedium: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87, inherit: true),
+              labelLarge: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87, inherit: true),
+              headlineMedium:
+                  const TextStyle(color: Colors.white, inherit: true),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (date == null) return;
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_selectedReminder ?? now),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: isDark
+                ? const ColorScheme.dark(
+                    primary: Color(0xFF0E9F6E),
+                    onPrimary: Colors.white,
+                    surface: Color(0xFF1F2937),
+                    onSurface: Colors.white,
+                  )
+                : const ColorScheme.light(
+                    primary: Color(0xFF0E9F6E),
+                    onPrimary: Colors.white,
+                    surface: Colors.white,
+                    onSurface: Colors.black87,
+                  ),
+            textTheme: TextTheme(
+              bodyLarge: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87, inherit: true),
+              bodyMedium: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87, inherit: true),
+              labelLarge: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87, inherit: true),
+              headlineMedium: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87, inherit: true),
+              displayLarge: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontSize: 56,
+                  fontWeight: FontWeight.w400,
+                  inherit: true),
+              displayMedium: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontSize: 45,
+                  fontWeight: FontWeight.w400,
+                  inherit: true),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (time == null) return;
     setState(() {
@@ -1278,11 +1522,51 @@ class _TaskListPageState extends State<TaskListPage>
                 ),
               ],
               const SizedBox(height: 10),
-              TextField(
-                controller: _imageCtrl,
-                decoration: const InputDecoration(
-                    labelText: 'URL zdjęcia (opcjonalnie)'),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _imageCtrl,
+                      decoration: const InputDecoration(
+                          labelText: 'URL zdjęcia (opcjonalnie)'),
+                      enabled: _selectedImageBase64 == null,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: Icon(
+                      _selectedImageBase64 != null
+                          ? Icons.check_circle
+                          : Icons.photo_library,
+                      color: _selectedImageBase64 != null ? Colors.green : null,
+                    ),
+                    tooltip: _selectedImageBase64 != null
+                        ? 'Zdjęcie wybrane'
+                        : 'Wybierz zdjęcie',
+                    onPressed: _pickImage,
+                  ),
+                  if (_selectedImageBase64 != null)
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.red),
+                      tooltip: 'Usuń zdjęcie',
+                      onPressed: () =>
+                          setState(() => _selectedImageBase64 = null),
+                    ),
+                ],
               ),
+              if (_selectedImageBase64 != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      base64Decode(_selectedImageBase64!),
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -1559,8 +1843,10 @@ class _TaskListPageState extends State<TaskListPage>
   Widget _buildCalendarTab() {
     final loc = AppLocalizations.of(context);
     final today = DateTime.now();
-    final firstDayOfMonth = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
-    final lastDayOfMonth = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
+    final firstDayOfMonth =
+        DateTime(_calendarMonth.year, _calendarMonth.month, 1);
+    final lastDayOfMonth =
+        DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
     final daysInMonth = lastDayOfMonth.day;
     final firstWeekday = firstDayOfMonth.weekday;
 
@@ -1592,7 +1878,8 @@ class _TaskListPageState extends State<TaskListPage>
                     icon: const Icon(Icons.chevron_left),
                     onPressed: () {
                       setState(() {
-                        _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month - 1);
+                        _calendarMonth = DateTime(
+                            _calendarMonth.year, _calendarMonth.month - 1);
                       });
                     },
                   ),
@@ -1615,7 +1902,8 @@ class _TaskListPageState extends State<TaskListPage>
                     icon: const Icon(Icons.chevron_right),
                     onPressed: () {
                       setState(() {
-                        _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month + 1);
+                        _calendarMonth = DateTime(
+                            _calendarMonth.year, _calendarMonth.month + 1);
                       });
                     },
                   ),
@@ -1694,7 +1982,10 @@ class _TaskListPageState extends State<TaskListPage>
                       padding: const EdgeInsets.all(32),
                       child: Text(
                         loc.selectedDayTasks,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyLarge
+                            ?.copyWith(color: Colors.grey),
                       ),
                     ),
                   ),
@@ -1707,15 +1998,16 @@ class _TaskListPageState extends State<TaskListPage>
     );
   }
 
-  Widget _buildStatColumn(BuildContext context, String value, String label, Color? color) {
+  Widget _buildStatColumn(
+      BuildContext context, String value, String label, Color? color) {
     return Column(
       children: [
         Text(
           value,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
         ),
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(fontSize: 12)),
@@ -1775,7 +2067,8 @@ class _TaskListPageState extends State<TaskListPage>
               return Container();
             }
 
-            final date = DateTime(_calendarMonth.year, _calendarMonth.month, dayNumber);
+            final date =
+                DateTime(_calendarMonth.year, _calendarMonth.month, dayNumber);
             final tasksOnDay = _items
                 .where((i) =>
                     i.createdAt.year == date.year &&
@@ -1785,12 +2078,12 @@ class _TaskListPageState extends State<TaskListPage>
 
             final completedOnDay = tasksOnDay.where((i) => i.completed).length;
             final isToday = date.year == DateTime.now().year &&
-                            date.month == DateTime.now().month &&
-                            date.day == DateTime.now().day;
+                date.month == DateTime.now().month &&
+                date.day == DateTime.now().day;
             final isSelected = _selectedDay != null &&
-                              _selectedDay!.year == date.year &&
-                              _selectedDay!.month == date.month &&
-                              _selectedDay!.day == date.day;
+                _selectedDay!.year == date.year &&
+                _selectedDay!.month == date.month &&
+                _selectedDay!.day == date.day;
 
             return InkWell(
               onTap: () {
@@ -1819,8 +2112,9 @@ class _TaskListPageState extends State<TaskListPage>
                     Text(
                       dayNumber.toString(),
                       style: TextStyle(
-                        fontWeight:
-                            isToday || isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: isToday || isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                         fontSize: 14,
                         color: isSelected ? Colors.white : null,
                       ),
@@ -1888,8 +2182,7 @@ class _TaskListPageState extends State<TaskListPage>
             child: Center(
               child: Column(
                 children: [
-                  Icon(Icons.event_busy,
-                      size: 64, color: Colors.grey.shade400),
+                  Icon(Icons.event_busy, size: 64, color: Colors.grey.shade400),
                   const SizedBox(height: 16),
                   Text(
                     AppLocalizations.of(context).emptyList,
@@ -1930,12 +2223,14 @@ class _TaskListPageState extends State<TaskListPage>
                   children: [
                     if (it.priority != null)
                       Chip(
-                        label: Text(it.priority!, style: const TextStyle(fontSize: 10)),
+                        label: Text(it.priority!,
+                            style: const TextStyle(fontSize: 10)),
                         visualDensity: VisualDensity.compact,
                       ),
                     if (it.priority != null) const SizedBox(width: 4),
                     Chip(
-                      label: Text(categoryLabel(it.category, context), style: const TextStyle(fontSize: 10)),
+                      label: Text(categoryLabel(it.category, context),
+                          style: const TextStyle(fontSize: 10)),
                       visualDensity: VisualDensity.compact,
                     ),
                   ],
@@ -1999,51 +2294,79 @@ class _TaskListPageState extends State<TaskListPage>
               padding: const EdgeInsets.all(8),
               children: _habits.map((habit) {
                 final streak = _calculateStreak(habit);
-                return Card(
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                  child: ListTile(
-                    leading: Icon(
-                      habit.isCompletedToday()
-                          ? Icons.favorite
-                          : Icons.favorite_border,
+                return Dismissible(
+                  key: Key(habit.name + habit.completedDates.length.toString()),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                    decoration: BoxDecoration(
                       color: Colors.red,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    title: Text(habit.name),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 4),
-                        Text(frequencyLabel(habit.frequency, context),
-                            style: const TextStyle(fontSize: 12)),
-                        const SizedBox(height: 4),
-                        Text('${loc.streak}: $streak ${loc.days}',
-                            style: const TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    trailing: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          if (habit.isCompletedToday()) {
-                            habit.completedDates.removeWhere((d) =>
-                                d.year == DateTime.now().year &&
-                                d.month == DateTime.now().month &&
-                                d.day == DateTime.now().day);
-                          } else {
-                            habit.completedDates.add(DateTime.now());
-                          }
-                        });
-                        _saveData();
-                      },
-                      child: Icon(
+                    child: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  onDismissed: (direction) {
+                    setState(() {
+                      _habits.remove(habit);
+                    });
+                    _saveData();
+                    scaffoldMessengerKey.currentState?.showSnackBar(
+                      SnackBar(content: Text(loc.deletedTask)),
+                    );
+                  },
+                  child: Card(
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                    child: ListTile(
+                      leading: Icon(
                         habit.isCompletedToday()
-                            ? Icons.check_circle
-                            : Icons.circle_outlined,
-                        color: habit.isCompletedToday()
-                            ? Colors.green
-                            : Colors.grey,
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        color: Colors.red,
                       ),
+                      title: Text(habit.name),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 4),
+                          if (habit.description != null)
+                            Text(habit.description!,
+                                style: const TextStyle(fontSize: 11)),
+                          Text(frequencyLabel(habit.frequency, context),
+                              style: const TextStyle(fontSize: 12)),
+                          const SizedBox(height: 4),
+                          Text('${loc.streak}: $streak ${loc.days}',
+                              style: const TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      trailing: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            if (habit.isCompletedToday()) {
+                              habit.completedDates.removeWhere((d) =>
+                                  d.year == DateTime.now().year &&
+                                  d.month == DateTime.now().month &&
+                                  d.day == DateTime.now().day);
+                            } else {
+                              habit.completedDates.add(DateTime.now());
+                            }
+                          });
+                          _saveData();
+                        },
+                        child: Icon(
+                          habit.isCompletedToday()
+                              ? Icons.check_circle
+                              : Icons.circle_outlined,
+                          color: habit.isCompletedToday()
+                              ? Colors.green
+                              : Colors.grey,
+                        ),
+                      ),
+                      onLongPress: () => _openEditHabitDialog(habit),
                     ),
                   ),
                 );
@@ -2079,67 +2402,162 @@ class _TaskListPageState extends State<TaskListPage>
 
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.addHabit),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                autofocus: true,
-                decoration: InputDecoration(hintText: loc.habitName),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: descCtrl,
-                maxLines: 2,
-                decoration: InputDecoration(labelText: loc.description),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<HabitFrequency>(
-                initialValue: selectedFreq,
-                decoration: InputDecoration(labelText: loc.frequency),
-                items: HabitFrequency.values
-                    .map((f) => DropdownMenuItem(
-                        value: f, child: Text(frequencyLabel(f, context))))
-                    .toList(),
-                onChanged: (f) {
-                  if (f != null) selectedFreq = f;
-                },
-              ),
-            ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text(loc.addHabit),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  autofocus: true,
+                  decoration: InputDecoration(hintText: loc.habitName),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 2,
+                  decoration: InputDecoration(labelText: loc.description),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<HabitFrequency>(
+                  value: selectedFreq,
+                  decoration: InputDecoration(labelText: loc.frequency),
+                  items: HabitFrequency.values
+                      .map((f) => DropdownMenuItem(
+                          value: f, child: Text(frequencyLabel(f, context))))
+                      .toList(),
+                  onChanged: (f) {
+                    if (f != null) {
+                      setState(() {
+                        selectedFreq = f;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(loc.cancel)),
+            ElevatedButton(
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) return;
+                this.setState(() {
+                  _habits.add(Habit(
+                    name: name,
+                    description: descCtrl.text.trim().isEmpty
+                        ? null
+                        : descCtrl.text.trim(),
+                    frequency: selectedFreq,
+                  ));
+                });
+                _saveData();
+                Navigator.of(ctx).pop();
+              },
+              child: Text(loc.add),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(loc.cancel)),
-          ElevatedButton(
-            onPressed: () {
-              final name = nameCtrl.text.trim();
-              if (name.isEmpty) return;
-              setState(() {
-                _habits.add(Habit(
-                  name: name,
-                  description: descCtrl.text.trim().isEmpty
-                      ? null
-                      : descCtrl.text.trim(),
-                  frequency: selectedFreq,
-                ));
-              });
-              _saveData();
-              Navigator.of(ctx).pop();
-            },
-            child: Text(loc.add),
+      ),
+    );
+  }
+
+  void _openEditHabitDialog(Habit habit) {
+    final loc = AppLocalizations.of(context);
+    final nameCtrl = TextEditingController(text: habit.name);
+    final descCtrl = TextEditingController(text: habit.description ?? '');
+    var selectedFreq = habit.frequency;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Edytuj nawyk'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  autofocus: true,
+                  decoration: InputDecoration(hintText: loc.habitName),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 2,
+                  decoration: InputDecoration(labelText: loc.description),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<HabitFrequency>(
+                  value: selectedFreq,
+                  decoration: InputDecoration(labelText: loc.frequency),
+                  items: HabitFrequency.values
+                      .map((f) => DropdownMenuItem(
+                          value: f, child: Text(frequencyLabel(f, context))))
+                      .toList(),
+                  onChanged: (f) {
+                    if (f != null) {
+                      setState(() {
+                        selectedFreq = f;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
-        ],
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(loc.cancel)),
+            ElevatedButton(
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) return;
+                this.setState(() {
+                  habit.name = name;
+                  habit.description = descCtrl.text.trim().isEmpty
+                      ? null
+                      : descCtrl.text.trim();
+                  habit.frequency = selectedFreq;
+                });
+                _saveData();
+                Navigator.of(ctx).pop();
+              },
+              child: Text(loc.add),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildAvatar(TaskItem it) {
     if (it.imageUrl != null && it.imageUrl!.isNotEmpty) {
+      // Перевіряємо чи це base64
+      if (it.imageUrl!.startsWith('data:image') || it.imageUrl!.length > 200) {
+        try {
+          String base64String = it.imageUrl!;
+          if (base64String.contains(',')) {
+            base64String = base64String.split(',')[1];
+          }
+          final Uint8List bytes = base64Decode(base64String);
+          return CircleAvatar(backgroundImage: MemoryImage(bytes));
+        } catch (e) {
+          // Якщо помилка декодування, показуємо заглушку
+          return CircleAvatar(
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+            child: const Icon(Icons.error),
+          );
+        }
+      }
+      // Інакше це URL
       return CircleAvatar(backgroundImage: NetworkImage(it.imageUrl!));
     }
     return CircleAvatar(
@@ -2577,8 +2995,70 @@ class _CategoriesManagementPageState extends State<CategoriesManagementPage> {
   }
 }
 
-class _SplashScreen extends StatelessWidget {
+class _SplashScreen extends StatefulWidget {
   const _SplashScreen();
+
+  @override
+  State<_SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<_SplashScreen>
+    with TickerProviderStateMixin {
+  late AnimationController _scaleController;
+  late AnimationController _fadeController;
+  late AnimationController _rotateController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _rotateAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Анімація масштабування
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _scaleAnimation = CurvedAnimation(
+      parent: _scaleController,
+      curve: Curves.elasticOut,
+    );
+
+    // Анімація появи
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeIn,
+    );
+
+    // Анімація обертання
+    _rotateController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _rotateAnimation = CurvedAnimation(
+      parent: _rotateController,
+      curve: Curves.easeInOut,
+    );
+
+    // Запускаємо анімації послідовно
+    _fadeController.forward().then((_) {
+      _scaleController.forward();
+      _rotateController.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    _fadeController.dispose();
+    _rotateController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2598,26 +3078,95 @@ class _SplashScreen extends StatelessWidget {
           ),
         ),
         child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.task_alt, size: 88, color: Colors.white),
-              SizedBox(height: 16),
-              Text(
-                'TaskFlow',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Анімована іконка з обертанням і масштабуванням
+                RotationTransition(
+                  turns: Tween<double>(begin: 0.0, end: 0.5)
+                      .animate(_rotateAnimation),
+                  child: ScaleTransition(
+                    scale: _scaleAnimation,
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 20,
+                            spreadRadius: 5,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.task_alt,
+                        size: 88,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Twoja lista zadań',
-                style: TextStyle(color: Colors.white70, fontSize: 16),
-              ),
-            ],
+                const SizedBox(height: 32),
+                // Анімований текст з появою знизу
+                SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.5),
+                    end: Offset.zero,
+                  ).animate(_fadeAnimation),
+                  child: const Text(
+                    'TaskFlow',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 42,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black26,
+                          offset: Offset(2, 2),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Анімований підзаголовок
+                FadeTransition(
+                  opacity: Tween<double>(begin: 0.0, end: 1.0).animate(
+                    CurvedAnimation(
+                      parent: _fadeController,
+                      curve: const Interval(0.5, 1.0, curve: Curves.easeIn),
+                    ),
+                  ),
+                  child: const Text(
+                    'Twoja lista zadań',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 18,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 40),
+                // Анімований індикатор завантаження
+                FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: const SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      strokeWidth: 3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

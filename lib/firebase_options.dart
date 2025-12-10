@@ -33,46 +33,46 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDummy-Web-Key-Replace-With-Real',
-    appId: '1:1234567890:web:abcdef1234567890abcdef',
-    messagingSenderId: '1234567890',
-    projectId: 'taskflow-demo',
-    authDomain: 'taskflow-demo.firebaseapp.com',
-    storageBucket: 'taskflow-demo.appspot.com',
+    apiKey: 'AIzaSyDY59aNn2BErQo97i8SY3jZDNkO1brQDrM',
+    appId: '1:200804731302:android:04ca904e762bab823ea767',
+    messagingSenderId: '200804731302',
+    projectId: 'taskflow-efae5',
+    authDomain: 'taskflow-efae5.firebaseapp.com',
+    storageBucket: 'taskflow-efae5.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDummy-Android-Key-Replace-With-Real',
-    appId: '1:1234567890:android:abcdef1234567890abcdef',
-    messagingSenderId: '1234567890',
-    projectId: 'taskflow-demo',
-    storageBucket: 'taskflow-demo.appspot.com',
+    apiKey: 'AIzaSyDY59aNn2BErQo97i8SY3jZDNkO1brQDrM',
+    appId: '1:200804731302:android:04ca904e762bab823ea767',
+    messagingSenderId: '200804731302',
+    projectId: 'taskflow-efae5',
+    storageBucket: 'taskflow-efae5.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDummy-iOS-Key-Replace-With-Real',
-    appId: '1:1234567890:ios:abcdef1234567890abcdef',
-    messagingSenderId: '1234567890',
-    projectId: 'taskflow-demo',
-    storageBucket: 'taskflow-demo.appspot.com',
+    apiKey: 'AIzaSyDY59aNn2BErQo97i8SY3jZDNkO1brQDrM',
+    appId: '1:200804731302:android:04ca904e762bab823ea767',
+    messagingSenderId: '200804731302',
+    projectId: 'taskflow-efae5',
+    storageBucket: 'taskflow-efae5.firebasestorage.app',
     iosBundleId: 'com.example.smartBuy',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyDummy-macOS-Key-Replace-With-Real',
-    appId: '1:1234567890:ios:abcdef1234567890abcdef',
-    messagingSenderId: '1234567890',
-    projectId: 'taskflow-demo',
-    storageBucket: 'taskflow-demo.appspot.com',
+    apiKey: 'AIzaSyDY59aNn2BErQo97i8SY3jZDNkO1brQDrM',
+    appId: '1:200804731302:android:04ca904e762bab823ea767',
+    messagingSenderId: '200804731302',
+    projectId: 'taskflow-efae5',
+    storageBucket: 'taskflow-efae5.firebasestorage.app',
     iosBundleId: 'com.example.smartBuy',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDummy-Windows-Key-Replace-With-Real',
-    appId: '1:1234567890:web:abcdef1234567890abcdef',
-    messagingSenderId: '1234567890',
-    projectId: 'taskflow-demo',
-    authDomain: 'taskflow-demo.firebaseapp.com',
-    storageBucket: 'taskflow-demo.appspot.com',
+    apiKey: 'AIzaSyDY59aNn2BErQo97i8SY3jZDNkO1brQDrM',
+    appId: '1:200804731302:android:04ca904e762bab823ea767',
+    messagingSenderId: '200804731302',
+    projectId: 'taskflow-efae5',
+    authDomain: 'taskflow-efae5.firebaseapp.com',
+    storageBucket: 'taskflow-efae5.firebasestorage.app',
   );
 }

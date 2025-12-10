@@ -9,8 +9,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io' show Platform;
 import 'firebase_options.dart';
 
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
@@ -66,12 +64,18 @@ class AuthService {
     try {
       // Перевірка чи Firebase ініціалізовано
       if (Firebase.apps.isEmpty) {
-        throw Exception('Firebase не ініціалізовано');
+        throw Exception(
+            'Firebase не ініціалізовано. Будь ласка, налаштуйте Firebase згідно з інструкцією у FIREBASE_SETUP.md');
       }
+
+      // Отримуємо Web Client ID з Firebase options для Web
+      String? webClientId = '200804731302-jqbp4asrj484dvop63nirnhei78c6lp1.apps.googleusercontent.com';
 
       // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await GoogleSignIn(
         scopes: ['email'],
+        // Передаємо clientId для Web
+        clientId: webClientId,
       ).signIn();
 
       if (googleUser == null) {
@@ -91,10 +95,82 @@ class AuthService {
 
       // Sign in to Firebase with the Google credential
       return await _auth.signInWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      // Firebase authentication помилки
+      debugPrint('Firebase Auth Error: ${e.code} - ${e.message}');
+      throw Exception(_getFirebaseErrorMessage(e.code));
     } catch (e) {
-      // Логуємо помилку для розробника
+      // Інші помилки
       debugPrint('Google Sign-In Error: $e');
+      
+      // OAuth client помилка (401: invalid_client)
+      if (e.toString().contains('invalid_client') ||
+          e.toString().contains('OAuth client was not found') ||
+          e.toString().contains('401')) {
+        throw Exception(
+            '🔐 Google Sign-In не налаштовано!\n\n'
+            '❌ Помилка: OAuth client не знайдено\n\n'
+            '✅ Як виправити:\n\n'
+            '1️⃣ Створіть Firebase проект:\n'
+            '   → https://console.firebase.google.com/\n\n'
+            '2️⃣ Увімкніть Google Sign-In:\n'
+            '   → Authentication → Sign-in method → Google → Enable\n\n'
+            '3️⃣ Налаштуйте проект:\n'
+            '   → flutterfire configure\n\n'
+            '4️⃣ Для Web (якщо використовуєте Chrome):\n'
+            '   → Додайте Client ID у web/index.html\n'
+            '   → Детально: WEB_SETUP.md\n\n'
+            '💡 Альтернатива:\n'
+            '   • Натисніть "Продовжити без акаунта"\n'
+            '   • Або використайте Email/Пароль\n\n'
+            '📖 Повна інструкція: FIREBASE_SETUP.md');
+      }
+      
+      // Спеціальна обробка для Web
+      if (e.toString().contains('ClientID not set') || 
+          e.toString().contains('appClientId')) {
+        throw Exception(
+            'Google Sign-In для Web не налаштовано.\n\n'
+            'Для використання на Web:\n'
+            '1. Створіть Firebase проект\n'
+            '2. Виконайте: flutterfire configure\n'
+            '3. Оновіть web/index.html з вашим Client ID\n\n'
+            'Детальна інструкція у файлі WEB_SETUP.md\n\n'
+            'Альтернатива: використайте мобільний додаток (Android/iOS) '
+            'або натисніть "Продовжити без акаунта"');
+      }
+      
+      if (e.toString().contains('API key not valid') ||
+          e.toString().contains('INVALID_API_KEY')) {
+        throw Exception(
+            'Firebase API ключ недійсний.\n\nБудь ласка, налаштуйте Firebase:\n1. Створіть проект на console.firebase.google.com\n2. Виконайте: flutterfire configure\n3. Перезапустіть додаток\n\nДетальна інструкція у файлі FIREBASE_SETUP.md');
+      }
       rethrow;
+    }
+  }
+
+  String _getFirebaseErrorMessage(String code) {
+    switch (code) {
+      case 'account-exists-with-different-credential':
+        return 'Акаунт з цією поштою вже існує з іншим методом входу';
+      case 'invalid-credential':
+        return 'Невірні дані для входу. Перевірте налаштування Firebase';
+      case 'operation-not-allowed':
+        return '🔐 Google Sign-In не увімкнено!\n\n'
+            'Увімкніть у Firebase Console:\n'
+            '1. Authentication → Sign-in method\n'
+            '2. Google → Enable → Save\n\n'
+            'Детальна інструкція: FIREBASE_SETUP.md';
+      case 'user-disabled':
+        return 'Цей акаунт був деактивований';
+      case 'user-not-found':
+        return 'Користувача не знайдено';
+      case 'wrong-password':
+        return 'Невірний пароль';
+      case 'invalid-api-key':
+        return 'Невірний Firebase API ключ. Налаштуйте Firebase згідно з FIREBASE_SETUP.md';
+      default:
+        return 'Помилка входу: $code';
     }
   }
 
@@ -1303,6 +1379,8 @@ class Habit {
   bool active;
   DateTime createdAt;
   List<DateTime> completedDates;
+  IconData icon;
+  List<int> selectedDays; // 1=Monday, 7=Sunday
 
   Habit({
     String? id,
@@ -1312,9 +1390,12 @@ class Habit {
     this.active = true,
     DateTime? createdAt,
     List<DateTime>? completedDates,
+    this.icon = Icons.check_circle,
+    List<int>? selectedDays,
   })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
         createdAt = createdAt ?? DateTime.now(),
-        completedDates = completedDates ?? [];
+        completedDates = completedDates ?? [],
+        selectedDays = selectedDays ?? [1, 2, 3, 4, 5, 6, 7];
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -1325,6 +1406,8 @@ class Habit {
         'createdAt': createdAt.toIso8601String(),
         'completedDates':
             completedDates.map((d) => d.toIso8601String()).toList(),
+        'iconCodePoint': icon.codePoint,
+        'selectedDays': selectedDays,
       };
 
   factory Habit.fromMap(Map<String, dynamic> m) {
@@ -1360,6 +1443,10 @@ class Habit {
       active: map['active'] == true,
       createdAt: parseDate(map['createdAt']) ?? DateTime.now(),
       completedDates: parseDates(map['completedDates']),
+      icon: IconData(map['iconCodePoint'] ?? Icons.check_circle.codePoint, fontFamily: 'MaterialIcons'),
+      selectedDays: map['selectedDays'] != null 
+          ? List<int>.from(map['selectedDays'])
+          : [1, 2, 3, 4, 5, 6, 7],
     );
   }
 
@@ -1367,6 +1454,12 @@ class Habit {
     final today = DateTime.now();
     return completedDates.any((d) =>
         d.year == today.year && d.month == today.month && d.day == today.day);
+  }
+  
+  bool isActiveToday() {
+    final today = DateTime.now();
+    final dayOfWeek = today.weekday; // 1=Monday, 7=Sunday
+    return selectedDays.contains(dayOfWeek);
   }
 }
 
@@ -3345,11 +3438,16 @@ class _TaskListPageState extends State<TaskListPage>
                     margin:
                         const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                     child: ListTile(
-                      leading: Icon(
-                        habit.isCompletedToday()
-                            ? Icons.favorite
-                            : Icons.favorite_border,
-                        color: Colors.red,
+                      leading: CircleAvatar(
+                        backgroundColor: habit.isCompletedToday()
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.grey[300],
+                        child: Icon(
+                          habit.icon,
+                          color: habit.isCompletedToday()
+                              ? Colors.white
+                              : Colors.grey[600],
+                        ),
                       ),
                       title: Text(habit.name),
                       subtitle: Column(
@@ -3361,13 +3459,33 @@ class _TaskListPageState extends State<TaskListPage>
                                 style: const TextStyle(fontSize: 11)),
                           Text(frequencyLabel(habit.frequency, context),
                               style: const TextStyle(fontSize: 12)),
+                          Row(
+                            children: [
+                              const Text('Дні: ', style: TextStyle(fontSize: 11)),
+                              ...['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'].asMap().entries.map((entry) {
+                                final dayNumber = entry.key + 1;
+                                final isSelected = habit.selectedDays.contains(dayNumber);
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 2),
+                                  child: Text(
+                                    entry.value,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      color: isSelected ? Theme.of(context).primaryColor : Colors.grey,
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
                           const SizedBox(height: 4),
                           Text('${loc.streak}: $streak ${loc.days}',
                               style: const TextStyle(
                                   fontSize: 12, fontWeight: FontWeight.bold)),
                         ],
                       ),
-                      trailing: GestureDetector(
+                      trailing: habit.isActiveToday() ? GestureDetector(
                         onTap: () {
                           setState(() {
                             if (habit.isCompletedToday()) {
@@ -3389,7 +3507,7 @@ class _TaskListPageState extends State<TaskListPage>
                               ? Colors.green
                               : Colors.grey,
                         ),
-                      ),
+                      ) : const Icon(Icons.remove_circle_outline, color: Colors.grey),
                       onLongPress: () => _openEditHabitDialog(habit),
                     ),
                   ),
@@ -3423,6 +3541,31 @@ class _TaskListPageState extends State<TaskListPage>
     final nameCtrl = TextEditingController();
     final descCtrl = TextEditingController();
     var selectedFreq = HabitFrequency.daily;
+    var selectedIcon = Icons.check_circle;
+    var selectedDays = <int>[1, 2, 3, 4, 5, 6, 7];
+    
+    final availableIcons = [
+      Icons.check_circle,
+      Icons.fitness_center,
+      Icons.book,
+      Icons.water_drop,
+      Icons.nightlight,
+      Icons.restaurant,
+      Icons.directions_run,
+      Icons.self_improvement,
+      Icons.favorite,
+      Icons.local_drink,
+      Icons.music_note,
+      Icons.brush,
+      Icons.school,
+      Icons.work,
+      Icons.pets,
+      Icons.smoking_rooms,
+      Icons.phone_android,
+      Icons.videogame_asset,
+    ];
+    
+    final dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
     showDialog<void>(
       context: context,
@@ -3460,6 +3603,74 @@ class _TaskListPageState extends State<TaskListPage>
                     }
                   },
                 ),
+                const SizedBox(height: 16),
+                Text('Дні тижня:', style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: List.generate(7, (index) {
+                    final dayNumber = index + 1;
+                    final isSelected = selectedDays.contains(dayNumber);
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            selectedDays.remove(dayNumber);
+                          } else {
+                            selectedDays.add(dayNumber);
+                          }
+                        });
+                      },
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isSelected ? Theme.of(context).primaryColor : Colors.grey[200],
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            dayNames[index],
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : Colors.grey[700],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 16),
+                Text('Іконка:', style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: availableIcons.map((icon) {
+                    final isSelected = icon == selectedIcon;
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          selectedIcon = icon;
+                        });
+                      },
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: isSelected ? Theme.of(context).primaryColor : Colors.grey[200],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          icon,
+                          color: isSelected ? Colors.white : Colors.grey[700],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
               ],
             ),
           ),
@@ -3471,6 +3682,12 @@ class _TaskListPageState extends State<TaskListPage>
               onPressed: () {
                 final name = nameCtrl.text.trim();
                 if (name.isEmpty) return;
+                if (selectedDays.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Виберіть хоча б один день')),
+                  );
+                  return;
+                }
                 this.setState(() {
                   _habits.add(Habit(
                     name: name,
@@ -3478,6 +3695,8 @@ class _TaskListPageState extends State<TaskListPage>
                         ? null
                         : descCtrl.text.trim(),
                     frequency: selectedFreq,
+                    icon: selectedIcon,
+                    selectedDays: selectedDays,
                   ));
                 });
                 _saveData();
@@ -3496,6 +3715,31 @@ class _TaskListPageState extends State<TaskListPage>
     final nameCtrl = TextEditingController(text: habit.name);
     final descCtrl = TextEditingController(text: habit.description ?? '');
     var selectedFreq = habit.frequency;
+    var selectedIcon = habit.icon;
+    var selectedDays = List<int>.from(habit.selectedDays);
+    
+    final availableIcons = [
+      Icons.check_circle,
+      Icons.fitness_center,
+      Icons.book,
+      Icons.water_drop,
+      Icons.nightlight,
+      Icons.restaurant,
+      Icons.directions_run,
+      Icons.self_improvement,
+      Icons.favorite,
+      Icons.local_drink,
+      Icons.music_note,
+      Icons.brush,
+      Icons.school,
+      Icons.work,
+      Icons.pets,
+      Icons.smoking_rooms,
+      Icons.phone_android,
+      Icons.videogame_asset,
+    ];
+    
+    final dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
     showDialog<void>(
       context: context,
@@ -3533,6 +3777,74 @@ class _TaskListPageState extends State<TaskListPage>
                     }
                   },
                 ),
+                const SizedBox(height: 16),
+                Text('Дні тижня:', style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: List.generate(7, (index) {
+                    final dayNumber = index + 1;
+                    final isSelected = selectedDays.contains(dayNumber);
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            selectedDays.remove(dayNumber);
+                          } else {
+                            selectedDays.add(dayNumber);
+                          }
+                        });
+                      },
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isSelected ? Theme.of(context).primaryColor : Colors.grey[200],
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            dayNames[index],
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : Colors.grey[700],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 16),
+                Text('Іконка:', style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: availableIcons.map((icon) {
+                    final isSelected = icon == selectedIcon;
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          selectedIcon = icon;
+                        });
+                      },
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: isSelected ? Theme.of(context).primaryColor : Colors.grey[200],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          icon,
+                          color: isSelected ? Colors.white : Colors.grey[700],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
               ],
             ),
           ),
@@ -3544,12 +3856,20 @@ class _TaskListPageState extends State<TaskListPage>
               onPressed: () {
                 final name = nameCtrl.text.trim();
                 if (name.isEmpty) return;
+                if (selectedDays.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Виберіть хоча б один день')),
+                  );
+                  return;
+                }
                 this.setState(() {
                   habit.name = name;
                   habit.description = descCtrl.text.trim().isEmpty
                       ? null
                       : descCtrl.text.trim();
                   habit.frequency = selectedFreq;
+                  habit.icon = selectedIcon;
+                  habit.selectedDays = selectedDays;
                 });
                 _saveData();
                 Navigator.of(ctx).pop();
@@ -4395,54 +4715,62 @@ class _AuthPageState extends State<AuthPage> {
                         ),
                       ),
                       const Divider(height: 32),
-                      // Google Sign-In (поки не налаштовано)
+                      // Google Sign-In
                       const Text(
                         'або',
                         style: TextStyle(color: Colors.grey),
                       ),
                       const SizedBox(height: 16),
-                      Tooltip(
-                        message:
-                            'Для використання Google Sign-In потрібно налаштувати Firebase проект',
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              _showMessage(
-                                  'Google Sign-In тимчасово недоступний.\n\n'
-                                  'Скористайтеся email/паролем або продовжте без акаунта.\n\n'
-                                  'Всі дані зберігаються локально на вашому пристрої.');
-                            },
-                            icon: Container(
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                              child: const Center(
-                                child: Text(
-                                  'G',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF4285F4),
-                                  ),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: OutlinedButton.icon(
+                          onPressed: _isLoading
+                              ? null
+                              : () async {
+                                  setState(() => _isLoading = true);
+                                  try {
+                                    await _authService.signInWithGoogle();
+                                    // Успішний вхід - AuthPage автоматично закриється
+                                  } catch (e) {
+                                    if (mounted) {
+                                      _showMessage(e
+                                          .toString()
+                                          .replaceAll('Exception: ', ''));
+                                    }
+                                  } finally {
+                                    if (mounted)
+                                      setState(() => _isLoading = false);
+                                  }
+                                },
+                          icon: Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'G',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF4285F4),
                                 ),
                               ),
                             ),
-                            label: const Text(
-                              'Увійти через Google',
-                              style: TextStyle(
-                                  fontSize: 16, color: Colors.black87),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              side: BorderSide(color: Colors.grey.shade300),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                          ),
+                          label: const Text(
+                            'Увійти через Google',
+                            style:
+                                TextStyle(fontSize: 16, color: Colors.black87),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            side: BorderSide(color: Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                         ),

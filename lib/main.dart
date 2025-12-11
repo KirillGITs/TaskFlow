@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -69,7 +70,8 @@ class AuthService {
       }
 
       // Отримуємо Web Client ID з Firebase options для Web
-      String? webClientId = '200804731302-jqbp4asrj484dvop63nirnhei78c6lp1.apps.googleusercontent.com';
+      String? webClientId =
+          '200804731302-jqbp4asrj484dvop63nirnhei78c6lp1.apps.googleusercontent.com';
 
       // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await GoogleSignIn(
@@ -102,13 +104,12 @@ class AuthService {
     } catch (e) {
       // Інші помилки
       debugPrint('Google Sign-In Error: $e');
-      
+
       // OAuth client помилка (401: invalid_client)
       if (e.toString().contains('invalid_client') ||
           e.toString().contains('OAuth client was not found') ||
           e.toString().contains('401')) {
-        throw Exception(
-            '🔐 Google Sign-In не налаштовано!\n\n'
+        throw Exception('🔐 Google Sign-In не налаштовано!\n\n'
             '❌ Помилка: OAuth client не знайдено\n\n'
             '✅ Як виправити:\n\n'
             '1️⃣ Створіть Firebase проект:\n'
@@ -125,12 +126,11 @@ class AuthService {
             '   • Або використайте Email/Пароль\n\n'
             '📖 Повна інструкція: FIREBASE_SETUP.md');
       }
-      
+
       // Спеціальна обробка для Web
-      if (e.toString().contains('ClientID not set') || 
+      if (e.toString().contains('ClientID not set') ||
           e.toString().contains('appClientId')) {
-        throw Exception(
-            'Google Sign-In для Web не налаштовано.\n\n'
+        throw Exception('Google Sign-In для Web не налаштовано.\n\n'
             'Для використання на Web:\n'
             '1. Створіть Firebase проект\n'
             '2. Виконайте: flutterfire configure\n'
@@ -139,7 +139,7 @@ class AuthService {
             'Альтернатива: використайте мобільний додаток (Android/iOS) '
             'або натисніть "Продовжити без акаунта"');
       }
-      
+
       if (e.toString().contains('API key not valid') ||
           e.toString().contains('INVALID_API_KEY')) {
         throw Exception(
@@ -279,6 +279,9 @@ class AppLocalizations {
       'notes': 'Notatki',
       'note': 'Notatka',
       'category': 'Kategoria',
+      'categories': 'Kategorie',
+      'add_category': 'Dodaj kategorię',
+      'manage_categories': 'Zarządzaj kategoriami',
       'image_url': 'URL zdjęcia (opcjonalnie)',
       'add_reminder': 'Dodaj przypomnienie',
       'reminder': 'Przypomnienie',
@@ -348,6 +351,8 @@ class AppLocalizations {
       'break_time': 'Czas przerwy',
       'inbox': 'Wiadomości',
       'inbox_desc': 'Wszystkie nowe zadania',
+      'today': 'Dzisiaj',
+      'today_desc': 'Zadania na dzisiaj',
       'habit_name': 'Nazwa nawyku',
       'description': 'Opis (opcjonalnie)',
       'frequency': 'Częstotliwość',
@@ -392,6 +397,7 @@ class AppLocalizations {
       'november': 'Listopad',
       'december': 'Grudzień',
       'profile': 'Profil',
+      'my_profile': 'Mój profil',
       'user': 'Użytkownik',
       'tasks_completed': 'zadań wykonano',
       'achievements': 'Osiągnięcia',
@@ -498,6 +504,8 @@ class AppLocalizations {
       'break_time': 'Час перерви',
       'inbox': 'Вхідні',
       'inbox_desc': 'Всі нові завдання',
+      'today': 'Сьогодні',
+      'today_desc': 'Завдання на сьогодні',
       'habit_name': 'Назва звички',
       'description': 'Опис (опціонально)',
       'frequency': 'Частота',
@@ -542,6 +550,7 @@ class AppLocalizations {
       'november': 'Листопад',
       'december': 'Грудень',
       'profile': 'Профіль',
+      'my_profile': 'Мій профіль',
       'user': 'Користувач',
       'tasks_completed': 'завдань виконано',
       'achievements': 'Досягнення',
@@ -579,6 +588,9 @@ class AppLocalizations {
       'notes': 'Заметки',
       'note': 'Заметка',
       'category': 'Категория',
+      'categories': 'Категории',
+      'add_category': 'Добавить категорию',
+      'manage_categories': 'Управление категориями',
       'image_url': 'URL изображения (опционально)',
       'add_reminder': 'Добавить напоминание',
       'reminder': 'Напоминание',
@@ -648,6 +660,8 @@ class AppLocalizations {
       'break_time': 'Время перерыва',
       'inbox': 'Входящие',
       'inbox_desc': 'Все новые задачи',
+      'today': 'Сегодня',
+      'today_desc': 'Задачи на сегодня',
       'habit_name': 'Название привычки',
       'description': 'Описание (опционально)',
       'frequency': 'Частота',
@@ -692,6 +706,7 @@ class AppLocalizations {
       'november': 'Ноябрь',
       'december': 'Декабрь',
       'profile': 'Профиль',
+      'my_profile': 'Мой профиль',
       'user': 'Пользователь',
       'tasks_completed': 'задач выполнено',
       'achievements': 'Достижения',
@@ -729,6 +744,9 @@ class AppLocalizations {
       'notes': 'Notes',
       'note': 'Note',
       'category': 'Category',
+      'categories': 'Categories',
+      'add_category': 'Add Category',
+      'manage_categories': 'Manage Categories',
       'image_url': 'Image URL (optional)',
       'add_reminder': 'Add reminder',
       'reminder': 'Reminder',
@@ -798,6 +816,8 @@ class AppLocalizations {
       'break_time': 'Break time',
       'inbox': 'Inbox',
       'inbox_desc': 'All new tasks',
+      'today': 'Today',
+      'today_desc': 'Tasks for today',
       'habit_name': 'Habit name',
       'description': 'Description (optional)',
       'frequency': 'Frequency',
@@ -842,6 +862,7 @@ class AppLocalizations {
       'november': 'November',
       'december': 'December',
       'profile': 'Profile',
+      'my_profile': 'My Profile',
       'user': 'User',
       'tasks_completed': 'tasks completed',
       'achievements': 'Achievements',
@@ -879,6 +900,9 @@ class AppLocalizations {
       'notes': 'Notizen',
       'note': 'Notiz',
       'category': 'Kategorie',
+      'categories': 'Kategorien',
+      'add_category': 'Kategorie hinzufügen',
+      'manage_categories': 'Kategorien verwalten',
       'image_url': 'Bild-URL (optional)',
       'add_reminder': 'Erinnerung hinzufügen',
       'reminder': 'Erinnerung',
@@ -948,6 +972,8 @@ class AppLocalizations {
       'break_time': 'Pausenzeit',
       'inbox': 'Posteingang',
       'inbox_desc': 'Alle neuen Aufgaben',
+      'today': 'Heute',
+      'today_desc': 'Aufgaben für heute',
       'habit_name': 'Gewohnheitsname',
       'description': 'Beschreibung (optional)',
       'frequency': 'Häufigkeit',
@@ -993,6 +1019,7 @@ class AppLocalizations {
       'november': 'November',
       'december': 'Dezember',
       'profile': 'Profil',
+      'my_profile': 'Mein Profil',
       'user': 'Benutzer',
       'tasks_completed': 'Aufgaben erledigt',
       'achievements': 'Erfolge',
@@ -1030,6 +1057,9 @@ class AppLocalizations {
       'notes': 'Notas',
       'note': 'Nota',
       'category': 'Categoría',
+      'categories': 'Categorías',
+      'add_category': 'Añadir Categoría',
+      'manage_categories': 'Gestionar Categorías',
       'image_url': 'URL de imagen (opcional)',
       'add_reminder': 'Añadir recordatorio',
       'reminder': 'Recordatorio',
@@ -1099,6 +1129,8 @@ class AppLocalizations {
       'break_time': 'Tiempo de descanso',
       'inbox': 'Bandeja de entrada',
       'inbox_desc': 'Todas las tareas nuevas',
+      'today': 'Hoy',
+      'today_desc': 'Tareas para hoy',
       'habit_name': 'Nombre del hábito',
       'description': 'Descripción (opcional)',
       'frequency': 'Frecuencia',
@@ -1144,6 +1176,7 @@ class AppLocalizations {
       'november': 'Noviembre',
       'december': 'Diciembre',
       'profile': 'Perfil',
+      'my_profile': 'Mi Perfil',
       'user': 'Usuario',
       'tasks_completed': 'tareas completadas',
       'achievements': 'Logros',
@@ -1186,6 +1219,9 @@ class AppLocalizations {
   String get priority => translate('priority');
   String get notes => translate('notes');
   String get category => translate('category');
+  String get categories => translate('categories');
+  String get addCategory => translate('add_category');
+  String get manageCategories => translate('manage_categories');
   String get imageUrl => translate('image_url');
   String get addReminder => translate('add_reminder');
   String get favorites => translate('favorites');
@@ -1247,6 +1283,8 @@ class AppLocalizations {
   String get breakTime => translate('break_time');
   String get inbox => translate('inbox');
   String get inboxDesc => translate('inbox_desc');
+  String get today => translate('today');
+  String get todayDesc => translate('today_desc');
   String get confirmClearTasks => translate('confirm_clear_tasks');
   String get confirmClearArchive => translate('confirm_clear_archive');
   String get note => translate('note');
@@ -1304,6 +1342,7 @@ class AppLocalizations {
 
   // Profile
   String get profile => translate('profile');
+  String get myProfile => translate('my_profile');
   String get user => translate('user');
   String get tasksCompleted => translate('tasks_completed');
   String get achievements => translate('achievements');
@@ -1443,8 +1482,9 @@ class Habit {
       active: map['active'] == true,
       createdAt: parseDate(map['createdAt']) ?? DateTime.now(),
       completedDates: parseDates(map['completedDates']),
-      icon: IconData(map['iconCodePoint'] ?? Icons.check_circle.codePoint, fontFamily: 'MaterialIcons'),
-      selectedDays: map['selectedDays'] != null 
+      icon: IconData(map['iconCodePoint'] ?? Icons.check_circle.codePoint,
+          fontFamily: 'MaterialIcons'),
+      selectedDays: map['selectedDays'] != null
           ? List<int>.from(map['selectedDays'])
           : [1, 2, 3, 4, 5, 6, 7],
     );
@@ -1455,7 +1495,7 @@ class Habit {
     return completedDates.any((d) =>
         d.year == today.year && d.month == today.month && d.day == today.day);
   }
-  
+
   bool isActiveToday() {
     final today = DateTime.now();
     final dayOfWeek = today.weekday; // 1=Monday, 7=Sunday
@@ -1469,12 +1509,14 @@ class TaskItem {
   bool completed;
   bool favorite;
   TaskCategory category;
+  String? customCategoryId;
   String? priority;
   String? notes;
   String? imageUrl;
   DateTime createdAt;
   DateTime? reminderAt;
   DateTime? archivedAt;
+  DateTime? dueDate;
 
   TaskItem({
     String? id,
@@ -1482,12 +1524,14 @@ class TaskItem {
     this.completed = false,
     this.favorite = false,
     this.category = TaskCategory.other,
+    this.customCategoryId,
     this.priority,
     this.notes,
     this.imageUrl,
     DateTime? createdAt,
     this.reminderAt,
     this.archivedAt,
+    this.dueDate,
   })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
         createdAt = createdAt ?? DateTime.now();
 
@@ -1497,12 +1541,14 @@ class TaskItem {
         'completed': completed,
         'favorite': favorite,
         'category': category.name,
+        'customCategoryId': customCategoryId,
         'priority': priority,
         'notes': notes,
         'imageUrl': imageUrl,
         'createdAt': createdAt.toIso8601String(),
         'reminderAt': reminderAt?.toIso8601String(),
         'archivedAt': archivedAt?.toIso8601String(),
+        'dueDate': dueDate?.toIso8601String(),
       };
 
   factory TaskItem.fromMap(Map<String, dynamic> m) {
@@ -1525,12 +1571,14 @@ class TaskItem {
       completed: map['completed'] == true,
       favorite: map['favorite'] == true,
       category: parseCat(map['category']?.toString()),
+      customCategoryId: map['customCategoryId']?.toString(),
       priority: map['priority']?.toString(),
       notes: map['notes']?.toString(),
       imageUrl: map['imageUrl']?.toString(),
       createdAt: parseDate(map['createdAt']) ?? DateTime.now(),
       reminderAt: parseDate(map['reminderAt']),
       archivedAt: parseDate(map['archivedAt']),
+      dueDate: parseDate(map['dueDate']),
     );
   }
 }
@@ -1606,11 +1654,11 @@ class _TaskManagerAppState extends State<TaskManagerApp> {
     await prefs.setString('language', languageCode);
   }
 
-  void _setTheme(ThemeMode mode) {
+  void _setTheme(ThemeMode mode) async {
     setState(() {
       _themeMode = mode;
     });
-    _saveTheme(mode);
+    await _saveTheme(mode);
   }
 
   void _setLanguage(String languageCode) {
@@ -1911,15 +1959,20 @@ class _TaskListPageState extends State<TaskListPage>
   final TextEditingController _imageCtrl = TextEditingController();
   String? _selectedImageBase64;
   TaskCategory _selectedCategory = TaskCategory.other;
+  String? _selectedCustomCategoryId;
   DateTime? _selectedReminder;
+  DateTime? _selectedDueDate;
   bool _favorite = false;
 
   final List<TaskItem> _items = [];
   final List<TaskItem> _archived = [];
   final List<Habit> _habits = [];
-  final List<CustomCategory> _customCategories = [];
+  List<CustomCategory> _customCategories = [];
   String _search = '';
   late TabController _tabController;
+  String? _profileAvatarBase64;
+  bool _isDrawerOpen = false;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   // Calendar state
   DateTime _calendarMonth = DateTime.now();
@@ -2073,6 +2126,15 @@ class _TaskListPageState extends State<TaskListPage>
           ..clear()
           ..addAll(parseCategories(categoriesRaw));
       });
+
+      // Завантажуємо аватарку профілю
+      final avatarData = cloudData?['profile_avatar'] as String? ??
+          prefs.getString('profile_avatar');
+      if (avatarData != null && avatarData.isNotEmpty) {
+        setState(() {
+          _profileAvatarBase64 = avatarData;
+        });
+      }
     } catch (e) {
       // ignore
     }
@@ -2090,6 +2152,11 @@ class _TaskListPageState extends State<TaskListPage>
     await prefs.setStringList('habits', habitsRaw);
     await prefs.setStringList('custom_categories', categoriesRaw);
 
+    // Зберігаємо аватарку профілю
+    if (_profileAvatarBase64 != null) {
+      await prefs.setString('profile_avatar', _profileAvatarBase64!);
+    }
+
     // Синхронізація з хмарою якщо користувач увійшов
     final authService = AuthService();
     if (authService.currentUser != null) {
@@ -2099,6 +2166,7 @@ class _TaskListPageState extends State<TaskListPage>
           'task_archived': archivedRaw,
           'habits': habitsRaw,
           'custom_categories': categoriesRaw,
+          'profile_avatar': _profileAvatarBase64,
           'last_sync': DateTime.now().toIso8601String(),
         });
       } catch (e) {
@@ -2125,6 +2193,33 @@ class _TaskListPageState extends State<TaskListPage>
     }
   }
 
+  Future<void> _pickProfileAvatar() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 90,
+    );
+
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      setState(() {
+        _profileAvatarBase64 = base64Encode(bytes);
+      });
+      await _saveData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Аватарка оновлена!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   void _resetDialogFields() {
     _nameCtrl.clear();
     _priorityCtrl.clear();
@@ -2132,7 +2227,9 @@ class _TaskListPageState extends State<TaskListPage>
     _imageCtrl.clear();
     _selectedImageBase64 = null;
     _selectedCategory = TaskCategory.other;
+    _selectedCustomCategoryId = null;
     _selectedReminder = null;
+    _selectedDueDate = null;
     _favorite = false;
   }
 
@@ -2147,6 +2244,7 @@ class _TaskListPageState extends State<TaskListPage>
           name: t,
           favorite: _favorite,
           category: _selectedCategory,
+          customCategoryId: _selectedCustomCategoryId,
           priority: _priorityCtrl.text.trim().isEmpty
               ? null
               : _priorityCtrl.text.trim(),
@@ -2154,6 +2252,7 @@ class _TaskListPageState extends State<TaskListPage>
           imageUrl: _selectedImageBase64 ??
               (_imageCtrl.text.trim().isEmpty ? null : _imageCtrl.text.trim()),
           reminderAt: _selectedReminder,
+          dueDate: _selectedDueDate,
         ),
       );
     });
@@ -2344,197 +2443,483 @@ class _TaskListPageState extends State<TaskListPage>
     _showTaskDialog(loc);
   }
 
-  void _showTaskDialog(AppLocalizations loc) {
-    showDialog<void>(
+  void _showAddCategoryDialog() {
+    final loc = AppLocalizations.of(context);
+    final nameController = TextEditingController();
+    IconData selectedIcon = Icons.label;
+    Color selectedColor = Colors.blue;
+
+    showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.addTask),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
             children: [
-              TextField(
-                controller: _nameCtrl,
-                autofocus: true,
-                decoration: InputDecoration(hintText: loc.taskName),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _priorityCtrl,
-                decoration: InputDecoration(labelText: loc.priority),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _notesCtrl,
-                maxLines: 3,
-                decoration: InputDecoration(labelText: loc.notes),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<TaskCategory>(
-                initialValue: _selectedCategory,
-                decoration: InputDecoration(labelText: loc.category),
-                items: TaskCategory.values
-                    .map((c) => DropdownMenuItem(
-                        value: c, child: Text(categoryLabel(c, context))))
-                    .toList(),
-                onChanged: (c) =>
-                    setState(() => _selectedCategory = c ?? TaskCategory.other),
-              ),
-              if (_customCategories.isNotEmpty) ...[
-                const SizedBox(height: 10),
+              const Icon(Icons.add_circle, color: Colors.blue),
+              const SizedBox(width: 8),
+              Text(loc.addCategory),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: loc.category,
+                    hintText: 'Назва категорії',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.title),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Icon selector
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: _customCategories
-                      .map((cat) => ChoiceChip(
-                            label: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(cat.icon, size: 16, color: cat.color),
-                                const SizedBox(width: 4),
-                                Text(cat.name),
-                              ],
-                            ),
-                            selected: false,
-                            onSelected: (selected) {
-                              // Custom categories as visual tags only
-                              scaffoldMessengerKey.currentState?.showSnackBar(
-                                SnackBar(
-                                    content:
-                                        Text('${cat.name} - ${loc.category}')),
-                              );
-                            },
-                          ))
-                      .toList(),
+                  children: [
+                    Icons.work,
+                    Icons.shopping_cart,
+                    Icons.home,
+                    Icons.school,
+                    Icons.sports_basketball,
+                    Icons.favorite,
+                    Icons.flight,
+                    Icons.restaurant,
+                    Icons.fitness_center,
+                    Icons.movie,
+                    Icons.music_note,
+                    Icons.book,
+                  ].map((icon) {
+                    final isSelected = selectedIcon == icon;
+                    return InkWell(
+                      onTap: () {
+                        setDialogState(() => selectedIcon = icon);
+                      },
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Colors.blue.withOpacity(0.2)
+                              : Colors.grey.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected ? Colors.blue : Colors.grey,
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        child: Icon(icon, color: selectedColor),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                // Color selector
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    Colors.blue,
+                    Colors.red,
+                    Colors.green,
+                    Colors.orange,
+                    Colors.purple,
+                    Colors.pink,
+                    Colors.teal,
+                    Colors.amber,
+                  ].map((color) {
+                    final isSelected = selectedColor == color;
+                    return InkWell(
+                      onTap: () {
+                        setDialogState(() => selectedColor = color);
+                      },
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color:
+                                isSelected ? Colors.black : Colors.transparent,
+                            width: 3,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ],
-              const SizedBox(height: 16),
-              // Секція додавання фото
-              Text(
-                loc.addPhoto,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              // Кнопка вибору фото з галереї
-              OutlinedButton.icon(
-                icon: Icon(
-                  _selectedImageBase64 != null
-                      ? Icons.check_circle
-                      : Icons.photo_library,
-                  color: _selectedImageBase64 != null ? Colors.green : null,
-                ),
-                label: Text(
-                  _selectedImageBase64 != null
-                      ? loc.photoSelected
-                      : loc.selectPhoto,
-                ),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                ),
-                onPressed: _pickImage,
-              ),
-              if (_selectedImageBase64 != null) ...[
-                const SizedBox(height: 8),
-                Stack(
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(loc.cancel),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add),
+              label: Text(loc.add),
+              onPressed: () {
+                if (nameController.text.trim().isEmpty) return;
+                setState(() {
+                  _customCategories.add(CustomCategory(
+                    name: nameController.text.trim(),
+                    icon: selectedIcon,
+                    color: selectedColor,
+                  ));
+                });
+                _saveData();
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                        '${loc.category} "${nameController.text.trim()}" ${loc.add.toLowerCase()}'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTaskDialog(AppLocalizations loc) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.add_task, color: Colors.blue),
+              const SizedBox(width: 8),
+              Text(loc.addTask),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Назва завдання зі зірочкою
+                Row(
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.memory(
-                        base64Decode(_selectedImageBase64!),
-                        height: 150,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+                    Expanded(
+                      child: TextField(
+                        controller: _nameCtrl,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: loc.taskName,
+                          border: const OutlineInputBorder(),
+                          filled: true,
+                        ),
                       ),
                     ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: IconButton(
-                        icon: const Icon(Icons.close),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.black54,
-                          foregroundColor: Colors.white,
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () {
+                        setDialogState(() {
+                          _favorite = !_favorite;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(50),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.0, end: _favorite ? 1.0 : 0.0),
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.elasticOut,
+                          builder: (context, value, child) {
+                            return Transform.scale(
+                              scale: 1.0 + (value * 0.2),
+                              child: Icon(
+                                _favorite ? Icons.star : Icons.star_border,
+                                color: Color.lerp(
+                                    Colors.grey.shade400, Colors.amber, value),
+                                size: 36,
+                              ),
+                            );
+                          },
                         ),
-                        tooltip: loc.removePhoto,
-                        onPressed: () =>
-                            setState(() => _selectedImageBase64 = null),
                       ),
                     ),
                   ],
                 ),
-              ],
-              const SizedBox(height: 12),
-              // Розділювач "або"
-              Row(
-                children: [
-                  const Expanded(child: Divider()),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      loc.or,
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
+                const SizedBox(height: 16),
+
+                // Категорія з іконкою
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(loc.category,
+                        style: Theme.of(context).textTheme.titleSmall),
+                    TextButton.icon(
+                      icon: const Icon(Icons.settings, size: 16),
+                      label: Text(loc.manageCategories),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CategoriesManagementPage(
+                              categories: _customCategories,
+                              onSave: (newCategories) {
+                                setState(() {
+                                  _customCategories = newCategories;
+                                });
+                                _saveData();
+                              },
+                            ),
+                          ),
+                        );
+                        _openAddDialog();
+                      },
                     ),
-                  ),
-                  const Expanded(child: Divider()),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Поле для URL
-              TextField(
-                controller: _imageCtrl,
-                decoration: InputDecoration(
-                  labelText: loc.enterImageUrl,
-                  hintText: 'https://example.com/image.jpg',
-                  prefixIcon: const Icon(Icons.link),
-                  border: const OutlineInputBorder(),
-                  helperText: loc.imageUrlHint,
-                  helperMaxLines: 2,
+                  ],
                 ),
-                enabled: _selectedImageBase64 == null,
-                keyboardType: TextInputType.url,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.alarm),
-                      label: Text(_selectedReminder == null
-                          ? loc.addReminder
-                          : '${loc.reminder}: ${_selectedReminder!.day}.${_selectedReminder!.month}.${_selectedReminder!.hour.toString().padLeft(2, '0')}:${_selectedReminder!.minute.toString().padLeft(2, '0')}'),
-                      onPressed: _pickReminder,
+                const SizedBox(height: 8),
+                // Standard categories
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: DropdownButtonFormField<TaskCategory>(
+                    value: _selectedCategory,
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      prefixIcon: const Icon(Icons.category),
+                      labelText: 'Стандартна',
+                    ),
+                    items: TaskCategory.values
+                        .map((c) => DropdownMenuItem(
+                            value: c, child: Text(categoryLabel(c, context))))
+                        .toList(),
+                    onChanged: (c) {
+                      setDialogState(() {
+                        _selectedCategory = c ?? TaskCategory.other;
+                        _selectedCustomCategoryId = null;
+                      });
+                      setState(() {
+                        _selectedCategory = c ?? TaskCategory.other;
+                        _selectedCustomCategoryId = null;
+                      });
+                    },
+                  ),
+                ),
+                if (_customCategories.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: DropdownButtonFormField<String?>(
+                      value: _selectedCustomCategoryId,
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        prefixIcon: const Icon(Icons.label),
+                        labelText: 'Власна категорія',
+                      ),
+                      items: [
+                        DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Не вибрано',
+                              style: TextStyle(color: Colors.grey.shade600)),
+                        ),
+                        ..._customCategories.map((c) => DropdownMenuItem(
+                              value: c.id,
+                              child: Row(
+                                children: [
+                                  Icon(c.icon, color: c.color, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(c.name),
+                                ],
+                              ),
+                            )),
+                      ],
+                      onChanged: (id) {
+                        setDialogState(() => _selectedCustomCategoryId = id);
+                        setState(() => _selectedCustomCategoryId = id);
+                      },
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: loc.favorite,
-                    onPressed: () => setState(() => _favorite = !_favorite),
-                    icon: Icon(_favorite ? Icons.star : Icons.star_border,
-                        color: Colors.amber),
+                ],
+                const SizedBox(height: 16),
+
+                // Пріоритет
+                TextField(
+                  controller: _priorityCtrl,
+                  decoration: InputDecoration(
+                    labelText: loc.priority,
+                    hintText: 'Високий, Середній, Низький',
+                    prefixIcon: const Icon(Icons.flag),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Примітки
+                TextField(
+                  controller: _notesCtrl,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText: loc.notes,
+                    hintText: 'Додаткова інформація...',
+                    prefixIcon: const Icon(Icons.note),
+                    border: const OutlineInputBorder(),
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                const Divider(),
+                const SizedBox(height: 8),
+
+                // Дедлайн
+                OutlinedButton.icon(
+                  icon: Icon(
+                    _selectedDueDate != null
+                        ? Icons.check_circle
+                        : Icons.calendar_today,
+                    color: _selectedDueDate != null ? Colors.green : null,
+                  ),
+                  label: Text(_selectedDueDate == null
+                      ? 'Вибрати дедлайн'
+                      : '📅 До: ${_selectedDueDate!.day}.${_selectedDueDate!.month}.${_selectedDueDate!.year}'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    backgroundColor:
+                        _selectedDueDate != null ? Colors.green.shade50 : null,
+                  ),
+                  onPressed: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDueDate ?? DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (date != null) {
+                      setDialogState(() => _selectedDueDate = date);
+                      setState(() => _selectedDueDate = date);
+                    }
+                  },
+                ),
+                if (_selectedDueDate != null)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.clear, size: 16),
+                      label: const Text('Прибрати'),
+                      onPressed: () {
+                        setDialogState(() => _selectedDueDate = null);
+                        setState(() => _selectedDueDate = null);
+                      },
+                    ),
+                  ),
+                const SizedBox(height: 8),
+
+                // Нагадування
+                OutlinedButton.icon(
+                  icon: Icon(
+                    _selectedReminder != null
+                        ? Icons.check_circle
+                        : Icons.alarm,
+                    color: _selectedReminder != null ? Colors.green : null,
+                  ),
+                  label: Text(_selectedReminder == null
+                      ? 'Додати нагадування'
+                      : '⏰ ${_selectedReminder!.day}.${_selectedReminder!.month} о ${_selectedReminder!.hour.toString().padLeft(2, '0')}:${_selectedReminder!.minute.toString().padLeft(2, '0')}'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    backgroundColor:
+                        _selectedReminder != null ? Colors.blue.shade50 : null,
+                  ),
+                  onPressed: _pickReminder,
+                ),
+                const SizedBox(height: 8),
+
+                // Фото
+                OutlinedButton.icon(
+                  icon: Icon(
+                    _selectedImageBase64 != null
+                        ? Icons.check_circle
+                        : Icons.photo_library,
+                    color: _selectedImageBase64 != null ? Colors.green : null,
+                  ),
+                  label: Text(
+                    _selectedImageBase64 != null
+                        ? '✓ Фото додано'
+                        : 'Додати фото',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    backgroundColor: _selectedImageBase64 != null
+                        ? Colors.purple.shade50
+                        : null,
+                  ),
+                  onPressed: _pickImage,
+                ),
+
+                if (_selectedImageBase64 != null) ...[
+                  const SizedBox(height: 8),
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.memory(
+                          base64Decode(_selectedImageBase64!),
+                          height: 120,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: IconButton(
+                          icon: const Icon(Icons.close),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.black54,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.all(4),
+                          ),
+                          onPressed: () {
+                            setDialogState(() => _selectedImageBase64 = null);
+                            setState(() => _selectedImageBase64 = null);
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ],
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(loc.cancel)),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add),
+              onPressed: () {
+                _addItem();
+                Navigator.of(ctx).pop();
+              },
+              label: Text(loc.add),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(loc.cancel)),
-          ElevatedButton(
-            onPressed: () {
-              _addItem();
-              Navigator.of(ctx).pop();
-            },
-            child: Text(loc.add),
-          ),
-        ],
       ),
     );
   }
@@ -2543,6 +2928,7 @@ class _TaskListPageState extends State<TaskListPage>
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         title: Text(loc.appTitle),
         bottom: TabBar(
@@ -2555,7 +2941,16 @@ class _TaskListPageState extends State<TaskListPage>
           ],
         ),
       ),
+      drawerScrimColor: Colors.transparent,
+      onDrawerChanged: (isOpened) {
+        setState(() {
+          _isDrawerOpen = isOpened;
+        });
+      },
       drawer: Drawer(
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.grey[900]
+            : Colors.white,
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
@@ -2574,19 +2969,47 @@ class _TaskListPageState extends State<TaskListPage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  CircleAvatar(
-                    radius: 35,
-                    backgroundColor: Colors.white,
-                    child: Icon(
-                      Icons.person,
-                      size: 40,
-                      color: Theme.of(context).colorScheme.primary,
+                  GestureDetector(
+                    onTap: _pickProfileAvatar,
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 35,
+                          backgroundColor: Colors.white,
+                          backgroundImage: _profileAvatarBase64 != null
+                              ? MemoryImage(base64Decode(_profileAvatarBase64!))
+                              : null,
+                          child: _profileAvatarBase64 == null
+                              ? Icon(
+                                  Icons.person,
+                                  size: 40,
+                                  color: Theme.of(context).colorScheme.primary,
+                                )
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    'Профіль',
-                    style: TextStyle(
+                  Text(
+                    loc.profile,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -2616,36 +3039,107 @@ class _TaskListPageState extends State<TaskListPage>
               ),
               onTap: () {
                 Navigator.pop(context);
-                setState(() {
-                  _tabController.index = 0; // Перехід на вкладку Tasks
-                });
+                Navigator.push(
+                  context,
+                  _createRoute(
+                    InboxPage(
+                      items: _items,
+                      onToggle: (item) {
+                        setState(() {
+                          item.completed = !item.completed;
+                        });
+                        _saveData();
+                      },
+                      onDelete: (item) {
+                        setState(() {
+                          _items.remove(item);
+                          _archived.add(item);
+                        });
+                        _saveData();
+                      },
+                      onEdit: (item) {
+                        final loc = AppLocalizations.of(context);
+                        _showTaskDialog(loc);
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.today),
+              title: Text(loc.today),
+              subtitle: Text(loc.todayDesc),
+              trailing: Text(
+                '${_getTodayTasksCount()}',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.secondary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  _createRoute(
+                    TodayTasksPage(
+                      items: _items,
+                      onToggle: (item) {
+                        setState(() {
+                          item.completed = !item.completed;
+                        });
+                        _saveData();
+                      },
+                      onDelete: (item) {
+                        setState(() {
+                          _items.remove(item);
+                          _archived.add(item);
+                        });
+                        _saveData();
+                      },
+                      onEdit: (item) {
+                        final loc = AppLocalizations.of(context);
+                        _showTaskDialog(loc);
+                      },
+                    ),
+                  ),
+                );
               },
             ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.person_outline),
-              title: const Text('Мій профіль'),
+              title: Text(loc.myProfile),
               onTap: () {
                 Navigator.pop(context);
-                // Підрахунок статистики
-                final completedCount =
-                    _items.where((item) => item.completed).length;
-                final totalCount = _items.length + _archived.length;
-                final activeHabitsCount = _habits.length;
-                final longestStreak = _habits.isEmpty
-                    ? 0
-                    : _habits
-                        .map((h) => _calculateStreak(h))
-                        .reduce((a, b) => a > b ? a : b);
-
                 Navigator.push(
                   context,
                   _createRoute(
                     ProfilePage(
+                      avatarBase64: _profileAvatarBase64,
+                    ),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.emoji_events),
+              title: Text(loc.achievements),
+              onTap: () {
+                Navigator.pop(context);
+                final completedCount =
+                    _items.where((item) => item.completed).length;
+                final totalCount = _items.length + _archived.length;
+                final activeHabitsCount = _habits.length;
+
+                Navigator.push(
+                  context,
+                  _createRoute(
+                    AchievementsPage(
                       totalTasks: totalCount,
                       completedTasks: completedCount,
                       habitsCount: activeHabitsCount,
-                      activeHabitsStreak: longestStreak,
                     ),
                   ),
                 );
@@ -2653,7 +3147,7 @@ class _TaskListPageState extends State<TaskListPage>
             ),
             ListTile(
               leading: const Icon(Icons.bar_chart),
-              title: const Text('Статистика'),
+              title: Text(loc.statistics),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -2667,6 +3161,38 @@ class _TaskListPageState extends State<TaskListPage>
                           .where((h) => h.completedDates.contains(
                               DateTime.now().toIso8601String().split('T')[0]))
                           .length,
+                    ),
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.category),
+              title: Text(loc.categories),
+              subtitle: Text(
+                  '${_customCategories.length} ${loc.category.toLowerCase()}'),
+              trailing: IconButton(
+                icon: const Icon(Icons.add_circle_outline),
+                tooltip: loc.addCategory,
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showAddCategoryDialog();
+                },
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await Navigator.push(
+                  context,
+                  _createRoute(
+                    CategoriesManagementPage(
+                      categories: _customCategories,
+                      onSave: (newCategories) {
+                        setState(() {
+                          _customCategories = newCategories;
+                        });
+                        _saveData();
+                      },
                     ),
                   ),
                 );
@@ -2724,7 +3250,7 @@ class _TaskListPageState extends State<TaskListPage>
           _buildTasksTab(),
           _buildCalendarTab(),
           _buildHabitsTab(),
-          const PomodoroPage(),
+          PomodoroPage(),
         ],
       ),
       floatingActionButton: _tabController.index == 0
@@ -2863,6 +3389,30 @@ class _TaskListPageState extends State<TaskListPage>
                                     Chip(
                                         label: Text(categoryLabel(
                                             it.category, context))),
+                                    if (it.dueDate != null)
+                                      Chip(
+                                          avatar: Icon(Icons.calendar_today,
+                                              size: 16,
+                                              color: it.dueDate!.isBefore(
+                                                          DateTime.now()) &&
+                                                      !it.completed
+                                                  ? Colors.red
+                                                  : null),
+                                          label: Text(
+                                              'До: ${it.dueDate!.day}.${it.dueDate!.month}.${it.dueDate!.year}',
+                                              style: TextStyle(
+                                                color: it.dueDate!.isBefore(
+                                                            DateTime.now()) &&
+                                                        !it.completed
+                                                    ? Colors.red
+                                                    : null,
+                                                fontWeight: it.dueDate!
+                                                            .isBefore(DateTime
+                                                                .now()) &&
+                                                        !it.completed
+                                                    ? FontWeight.bold
+                                                    : null,
+                                              ))),
                                     if (due != null)
                                       Chip(
                                           avatar:
@@ -3461,18 +4011,27 @@ class _TaskListPageState extends State<TaskListPage>
                               style: const TextStyle(fontSize: 12)),
                           Row(
                             children: [
-                              const Text('Дні: ', style: TextStyle(fontSize: 11)),
-                              ...['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'].asMap().entries.map((entry) {
+                              const Text('Дні: ',
+                                  style: TextStyle(fontSize: 11)),
+                              ...['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
+                                  .asMap()
+                                  .entries
+                                  .map((entry) {
                                 final dayNumber = entry.key + 1;
-                                final isSelected = habit.selectedDays.contains(dayNumber);
+                                final isSelected =
+                                    habit.selectedDays.contains(dayNumber);
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 2),
                                   child: Text(
                                     entry.value,
                                     style: TextStyle(
                                       fontSize: 11,
-                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                      color: isSelected ? Theme.of(context).primaryColor : Colors.grey,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: isSelected
+                                          ? Theme.of(context).primaryColor
+                                          : Colors.grey,
                                     ),
                                   ),
                                 );
@@ -3485,29 +4044,32 @@ class _TaskListPageState extends State<TaskListPage>
                                   fontSize: 12, fontWeight: FontWeight.bold)),
                         ],
                       ),
-                      trailing: habit.isActiveToday() ? GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            if (habit.isCompletedToday()) {
-                              habit.completedDates.removeWhere((d) =>
-                                  d.year == DateTime.now().year &&
-                                  d.month == DateTime.now().month &&
-                                  d.day == DateTime.now().day);
-                            } else {
-                              habit.completedDates.add(DateTime.now());
-                            }
-                          });
-                          _saveData();
-                        },
-                        child: Icon(
-                          habit.isCompletedToday()
-                              ? Icons.check_circle
-                              : Icons.circle_outlined,
-                          color: habit.isCompletedToday()
-                              ? Colors.green
-                              : Colors.grey,
-                        ),
-                      ) : const Icon(Icons.remove_circle_outline, color: Colors.grey),
+                      trailing: habit.isActiveToday()
+                          ? GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  if (habit.isCompletedToday()) {
+                                    habit.completedDates.removeWhere((d) =>
+                                        d.year == DateTime.now().year &&
+                                        d.month == DateTime.now().month &&
+                                        d.day == DateTime.now().day);
+                                  } else {
+                                    habit.completedDates.add(DateTime.now());
+                                  }
+                                });
+                                _saveData();
+                              },
+                              child: Icon(
+                                habit.isCompletedToday()
+                                    ? Icons.check_circle
+                                    : Icons.circle_outlined,
+                                color: habit.isCompletedToday()
+                                    ? Colors.green
+                                    : Colors.grey,
+                              ),
+                            )
+                          : const Icon(Icons.remove_circle_outline,
+                              color: Colors.grey),
                       onLongPress: () => _openEditHabitDialog(habit),
                     ),
                   ),
@@ -3536,6 +4098,21 @@ class _TaskListPageState extends State<TaskListPage>
     return streak;
   }
 
+  int _getTodayTasksCount() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    return _items.where((item) {
+      if (item.dueDate == null) return false;
+      final dueDay = DateTime(
+        item.dueDate!.year,
+        item.dueDate!.month,
+        item.dueDate!.day,
+      );
+      return dueDay.isAtSameMomentAs(today);
+    }).length;
+  }
+
   void _openAddHabitDialog() {
     final loc = AppLocalizations.of(context);
     final nameCtrl = TextEditingController();
@@ -3543,7 +4120,7 @@ class _TaskListPageState extends State<TaskListPage>
     var selectedFreq = HabitFrequency.daily;
     var selectedIcon = Icons.check_circle;
     var selectedDays = <int>[1, 2, 3, 4, 5, 6, 7];
-    
+
     final availableIcons = [
       Icons.check_circle,
       Icons.fitness_center,
@@ -3564,7 +4141,7 @@ class _TaskListPageState extends State<TaskListPage>
       Icons.phone_android,
       Icons.videogame_asset,
     ];
-    
+
     final dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
     showDialog<void>(
@@ -3604,7 +4181,8 @@ class _TaskListPageState extends State<TaskListPage>
                   },
                 ),
                 const SizedBox(height: 16),
-                Text('Дні тижня:', style: Theme.of(context).textTheme.labelLarge),
+                Text('Дні тижня:',
+                    style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -3626,14 +4204,17 @@ class _TaskListPageState extends State<TaskListPage>
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: isSelected ? Theme.of(context).primaryColor : Colors.grey[200],
+                          color: isSelected
+                              ? Theme.of(context).primaryColor
+                              : Colors.grey[200],
                           shape: BoxShape.circle,
                         ),
                         child: Center(
                           child: Text(
                             dayNames[index],
                             style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.grey[700],
+                              color:
+                                  isSelected ? Colors.white : Colors.grey[700],
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -3660,7 +4241,9 @@ class _TaskListPageState extends State<TaskListPage>
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: isSelected ? Theme.of(context).primaryColor : Colors.grey[200],
+                          color: isSelected
+                              ? Theme.of(context).primaryColor
+                              : Colors.grey[200],
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
@@ -3717,7 +4300,7 @@ class _TaskListPageState extends State<TaskListPage>
     var selectedFreq = habit.frequency;
     var selectedIcon = habit.icon;
     var selectedDays = List<int>.from(habit.selectedDays);
-    
+
     final availableIcons = [
       Icons.check_circle,
       Icons.fitness_center,
@@ -3738,7 +4321,7 @@ class _TaskListPageState extends State<TaskListPage>
       Icons.phone_android,
       Icons.videogame_asset,
     ];
-    
+
     final dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
     showDialog<void>(
@@ -3778,7 +4361,8 @@ class _TaskListPageState extends State<TaskListPage>
                   },
                 ),
                 const SizedBox(height: 16),
-                Text('Дні тижня:', style: Theme.of(context).textTheme.labelLarge),
+                Text('Дні тижня:',
+                    style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -3800,14 +4384,17 @@ class _TaskListPageState extends State<TaskListPage>
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: isSelected ? Theme.of(context).primaryColor : Colors.grey[200],
+                          color: isSelected
+                              ? Theme.of(context).primaryColor
+                              : Colors.grey[200],
                           shape: BoxShape.circle,
                         ),
                         child: Center(
                           child: Text(
                             dayNames[index],
                             style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.grey[700],
+                              color:
+                                  isSelected ? Colors.white : Colors.grey[700],
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -3834,7 +4421,9 @@ class _TaskListPageState extends State<TaskListPage>
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: isSelected ? Theme.of(context).primaryColor : Colors.grey[200],
+                          color: isSelected
+                              ? Theme.of(context).primaryColor
+                              : Colors.grey[200],
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
@@ -4796,6 +5385,636 @@ class _AuthPageState extends State<AuthPage> {
   }
 }
 
+// Сторінка вхідних завдань
+class InboxPage extends StatelessWidget {
+  final List<TaskItem> items;
+  final void Function(TaskItem) onToggle;
+  final void Function(TaskItem) onDelete;
+  final void Function(TaskItem) onEdit;
+
+  const InboxPage({
+    super.key,
+    required this.items,
+    required this.onToggle,
+    required this.onDelete,
+    required this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+    final inboxItems = items.where((item) => !item.completed).toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(loc.inbox),
+        elevation: 0,
+      ),
+      body: Column(
+        children: [
+          // Header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Theme.of(context).colorScheme.primary,
+                  Theme.of(context).colorScheme.secondary,
+                ],
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.inbox,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      loc.inbox,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  loc.inboxDesc,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.pending_actions,
+                              color: Colors.white, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${inboxItems.length}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            loc.toDo,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Список завдань
+          Expanded(
+            child: inboxItems.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 80,
+                          color: Colors.grey.shade300,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Всі завдання виконано! 🎉',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Додайте нові завдання',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: inboxItems.length,
+                    itemBuilder: (ctx, i) {
+                      final item = inboxItems[i];
+                      return Dismissible(
+                        key: Key(item.id),
+                        background: Container(
+                          color: Colors.green,
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.only(left: 20),
+                          child: const Icon(Icons.check, color: Colors.white),
+                        ),
+                        secondaryBackground: Container(
+                          color: Colors.red,
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          child: const Icon(Icons.delete, color: Colors.white),
+                        ),
+                        confirmDismiss: (direction) async {
+                          if (direction == DismissDirection.startToEnd) {
+                            onToggle(item);
+                            return false;
+                          }
+                          return true;
+                        },
+                        onDismissed: (direction) {
+                          onDelete(item);
+                        },
+                        child: Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          elevation: 2,
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            leading: Checkbox(
+                              value: item.completed,
+                              onChanged: (_) => onToggle(item),
+                            ),
+                            title: Text(
+                              item.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (item.notes != null &&
+                                    item.notes!.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    item.notes!,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.label,
+                                      size: 16,
+                                      color:
+                                          _getCategoryColor(item.category.name),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(item.category.name),
+                                    if (item.priority != null &&
+                                        item.priority!.isNotEmpty) ...[
+                                      const SizedBox(width: 12),
+                                      ...List.generate(
+                                        int.tryParse(item.priority!) ?? 0,
+                                        (i) => const Icon(
+                                          Icons.flag,
+                                          size: 16,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ],
+                                    if (item.dueDate != null) ...[
+                                      const SizedBox(width: 12),
+                                      Icon(
+                                        Icons.calendar_today,
+                                        size: 16,
+                                        color: _isOverdue(item.dueDate!)
+                                            ? Colors.red
+                                            : Colors.blue,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _formatDueDate(item.dueDate!),
+                                        style: TextStyle(
+                                          color: _isOverdue(item.dueDate!)
+                                              ? Colors.red
+                                              : Colors.blue,
+                                          fontWeight: _isOverdue(item.dueDate!)
+                                              ? FontWeight.bold
+                                              : null,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => onEdit(item),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getCategoryColor(String category) {
+    switch (category) {
+      case 'work':
+      case 'Work':
+      case 'Робота':
+        return Colors.blue;
+      case 'personal':
+      case 'Personal':
+      case 'Особисте':
+        return Colors.green;
+      case 'home':
+      case 'Home':
+      case 'Дім':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  bool _isOverdue(DateTime dueDate) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    return due.isBefore(today);
+  }
+
+  String _formatDueDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    final dueDay = DateTime(date.year, date.month, date.day);
+
+    if (dueDay.isAtSameMomentAs(today)) {
+      return 'Сьогодні';
+    } else if (dueDay.isAtSameMomentAs(tomorrow)) {
+      return 'Завтра';
+    } else if (dueDay.isBefore(today)) {
+      final diff = today.difference(dueDay).inDays;
+      return 'Прострочено на $diff дн.';
+    } else {
+      return '${date.day}.${date.month}.${date.year}';
+    }
+  }
+}
+
+// Сторінка завдань на сьогодні
+class TodayTasksPage extends StatelessWidget {
+  final List<TaskItem> items;
+  final void Function(TaskItem) onToggle;
+  final void Function(TaskItem) onDelete;
+  final void Function(TaskItem) onEdit;
+
+  const TodayTasksPage({
+    super.key,
+    required this.items,
+    required this.onToggle,
+    required this.onDelete,
+    required this.onEdit,
+  });
+
+  List<TaskItem> _getTodayTasks() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    return items.where((item) {
+      if (item.dueDate == null) return false;
+      final dueDay = DateTime(
+        item.dueDate!.year,
+        item.dueDate!.month,
+        item.dueDate!.day,
+      );
+      return dueDay.isAtSameMomentAs(today);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+    final todayTasks = _getTodayTasks();
+    final completedToday = todayTasks.where((t) => t.completed).length;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(loc.today),
+        elevation: 0,
+      ),
+      body: Column(
+        children: [
+          // Header з інформацією про сьогоднішній день
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Theme.of(context).colorScheme.secondary,
+                  Theme.of(context).colorScheme.primary,
+                ],
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.today,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      loc.today,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _formatDate(DateTime.now()),
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    _buildStatChip(
+                      context,
+                      Icons.task_alt,
+                      '$completedToday/${todayTasks.length}',
+                      loc.completed,
+                    ),
+                    const SizedBox(width: 12),
+                    if (todayTasks.length - completedToday > 0)
+                      _buildStatChip(
+                        context,
+                        Icons.pending_actions,
+                        '${todayTasks.length - completedToday}',
+                        loc.toDo,
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Список завдань
+          Expanded(
+            child: todayTasks.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 80,
+                          color: Colors.grey.shade300,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Немає завдань на сьогодні',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Додайте завдання з датою на сьогодні',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: todayTasks.length,
+                    itemBuilder: (ctx, i) {
+                      final item = todayTasks[i];
+                      return Dismissible(
+                        key: Key(item.id),
+                        background: Container(
+                          color: Colors.green,
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.only(left: 20),
+                          child: const Icon(Icons.check, color: Colors.white),
+                        ),
+                        secondaryBackground: Container(
+                          color: Colors.red,
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          child: const Icon(Icons.delete, color: Colors.white),
+                        ),
+                        confirmDismiss: (direction) async {
+                          if (direction == DismissDirection.startToEnd) {
+                            onToggle(item);
+                            return false;
+                          }
+                          return true;
+                        },
+                        onDismissed: (direction) {
+                          onDelete(item);
+                        },
+                        child: Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          elevation: 2,
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            leading: Checkbox(
+                              value: item.completed,
+                              onChanged: (_) => onToggle(item),
+                            ),
+                            title: Text(
+                              item.name,
+                              style: TextStyle(
+                                decoration: item.completed
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (item.notes != null &&
+                                    item.notes!.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    item.notes!,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.label,
+                                      size: 16,
+                                      color:
+                                          _getCategoryColor(item.category.name),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(item.category.name),
+                                    if (item.priority != null &&
+                                        item.priority!.isNotEmpty) ...[
+                                      const SizedBox(width: 12),
+                                      ...List.generate(
+                                        int.tryParse(item.priority!) ?? 0,
+                                        (i) => const Icon(
+                                          Icons.flag,
+                                          size: 16,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => onEdit(item),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatChip(
+    BuildContext context,
+    IconData icon,
+    String value,
+    String label,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+    final months = [
+      'січня',
+      'лютого',
+      'березня',
+      'квітня',
+      'травня',
+      'червня',
+      'липня',
+      'серпня',
+      'вересня',
+      'жовтня',
+      'листопада',
+      'грудня'
+    ];
+
+    return '${days[date.weekday - 1]}, ${date.day} ${months[date.month - 1]}';
+  }
+
+  Color _getCategoryColor(String category) {
+    switch (category) {
+      case 'Робота':
+      case 'Work':
+        return Colors.blue;
+      case 'Особисте':
+      case 'Personal':
+        return Colors.green;
+      case 'Дім':
+      case 'Home':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+}
+
 class StatisticsPage extends StatelessWidget {
   final int totalTasks;
   final int completedTasks;
@@ -4927,47 +6146,6 @@ class StatisticsPage extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              // Досягнення
-              Text(
-                loc.achievements,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _buildAchievementCard(
-                context,
-                Icons.workspace_premium,
-                loc.beginner,
-                loc.beginnerDesc,
-                totalTasks > 0,
-              ),
-              const SizedBox(height: 12),
-              _buildAchievementCard(
-                context,
-                Icons.military_tech,
-                loc.productive,
-                loc.productiveDesc,
-                completedTasks >= 10,
-              ),
-              const SizedBox(height: 12),
-              _buildAchievementCard(
-                context,
-                Icons.emoji_events,
-                loc.master,
-                loc.masterDesc,
-                completedTasks >= 50,
-              ),
-              const SizedBox(height: 12),
-              _buildAchievementCard(
-                context,
-                Icons.auto_awesome,
-                loc.habitMaster,
-                loc.habitMasterDesc,
-                habitsCount >= 5,
-              ),
             ],
           ),
         ),
@@ -5008,45 +6186,6 @@ class StatisticsPage extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  static Widget _buildAchievementCard(
-    BuildContext context,
-    IconData icon,
-    String title,
-    String description,
-    bool unlocked,
-  ) {
-    return Card(
-      elevation: unlocked ? 2 : 0,
-      color: unlocked ? null : Colors.grey.shade100,
-      child: ListTile(
-        leading: Icon(
-          icon,
-          size: 32,
-          color: unlocked
-              ? Theme.of(context).colorScheme.primary
-              : Colors.grey.shade400,
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: unlocked ? null : Colors.grey.shade600,
-          ),
-        ),
-        subtitle: Text(
-          description,
-          style: TextStyle(
-            fontSize: 12,
-            color: unlocked ? Colors.grey.shade600 : Colors.grey.shade500,
-          ),
-        ),
-        trailing: unlocked
-            ? Icon(Icons.check_circle, color: Colors.green.shade600)
-            : Icon(Icons.lock, color: Colors.grey.shade400),
       ),
     );
   }
@@ -5303,24 +6442,16 @@ class _PomodoroPageState extends State<PomodoroPage> {
 }
 
 class ProfilePage extends StatelessWidget {
-  final int totalTasks;
-  final int completedTasks;
-  final int habitsCount;
-  final int activeHabitsStreak;
+  final String? avatarBase64;
 
   const ProfilePage({
     super.key,
-    required this.totalTasks,
-    required this.completedTasks,
-    required this.habitsCount,
-    required this.activeHabitsStreak,
+    this.avatarBase64,
   });
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
-    final completionRate =
-        totalTasks > 0 ? (completedTasks / totalTasks * 100).round() : 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -5330,7 +6461,7 @@ class ProfilePage extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Градієнтний header
+            // Градієнтний header з аватаркою
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
@@ -5348,20 +6479,25 @@ class ProfilePage extends StatelessWidget {
                 child: Column(
                   children: [
                     CircleAvatar(
-                      radius: 50,
+                      radius: 60,
                       backgroundColor: Colors.white,
-                      child: Icon(
-                        Icons.person,
-                        size: 60,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+                      backgroundImage: avatarBase64 != null
+                          ? MemoryImage(base64Decode(avatarBase64!))
+                          : null,
+                      child: avatarBase64 == null
+                          ? Icon(
+                              Icons.person,
+                              size: 70,
+                              color: Theme.of(context).colorScheme.primary,
+                            )
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     Text(
                       loc.user,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 24,
+                        fontSize: 28,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -5370,165 +6506,23 @@ class ProfilePage extends StatelessWidget {
                       'TaskFlow • ${DateTime.now().year}',
                       style: const TextStyle(
                         color: Colors.white70,
-                        fontSize: 14,
+                        fontSize: 16,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-            // Статистика
+            // Інформація про акаунт
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    loc.statistics,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatCard(
-                          context,
-                          Icons.task_alt,
-                          totalTasks.toString(),
-                          loc.totalTasks,
-                          Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatCard(
-                          context,
-                          Icons.check_circle,
-                          completedTasks.toString(),
-                          loc.completedTasks,
-                          Colors.green,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatCard(
-                          context,
-                          Icons.favorite,
-                          habitsCount.toString(),
-                          loc.habits,
-                          Colors.red,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatCard(
-                          context,
-                          Icons.local_fire_department,
-                          activeHabitsStreak.toString(),
-                          '${loc.streak} ${loc.days}',
-                          Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  // Прогрес
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                loc.progress,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                '$completionRate%',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: LinearProgressIndicator(
-                              value: completionRate / 100,
-                              minHeight: 10,
-                              backgroundColor: Colors.grey.shade200,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Theme.of(context).colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '$completedTasks з $totalTasks ${loc.tasksCompleted}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Досягнення
-                  const Text(
-                    'Досягнення',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildAchievementCard(
-                    context,
-                    Icons.workspace_premium,
-                    loc.beginner,
-                    loc.beginnerDesc,
-                    totalTasks > 0,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildAchievementCard(
-                    context,
-                    Icons.military_tech,
-                    loc.productive,
-                    loc.productiveDesc,
-                    completedTasks >= 10,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildAchievementCard(
-                    context,
-                    Icons.emoji_events,
-                    loc.master,
-                    loc.masterDesc,
-                    habitsCount >= 5,
-                  ),
-                  const SizedBox(height: 24),
-                  // Інформація про акаунт
-                  Text(
                     loc.account,
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -5538,33 +6532,92 @@ class ProfilePage extends StatelessWidget {
                     builder: (context, snapshot) {
                       final user = snapshot.data;
                       if (user != null) {
-                        return Card(
-                          child: ListTile(
-                            leading: const Icon(Icons.account_circle),
-                            title: const Text('Email акаунт'),
-                            subtitle: Text(user.email ?? ''),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.logout),
-                              onPressed: () async {
-                                await AuthService().signOut();
-                                final prefs =
-                                    await SharedPreferences.getInstance();
-                                await prefs.remove('auth_skipped');
-                                if (context.mounted) {
-                                  Navigator.of(context)
-                                      .popUntil((route) => route.isFirst);
-                                }
-                              },
+                        return Column(
+                          children: [
+                            Card(
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor:
+                                      Theme.of(context).colorScheme.primary,
+                                  child: const Icon(Icons.email,
+                                      color: Colors.white),
+                                ),
+                                title: const Text('Email'),
+                                subtitle: Text(user.email ?? ''),
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 12),
+                            Card(
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Colors.green,
+                                  child: const Icon(Icons.cloud_done,
+                                      color: Colors.white),
+                                ),
+                                title: Text(loc.account),
+                                subtitle:
+                                    const Text('Дані синхронізуються з хмарою'),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Card(
+                              color: Colors.red.shade50,
+                              child: ListTile(
+                                leading:
+                                    const Icon(Icons.logout, color: Colors.red),
+                                title: Text(
+                                  loc.logout,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                subtitle: const Text('Вийти з акаунту'),
+                                onTap: () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Вийти з акаунту?'),
+                                      content: const Text(
+                                          'Дані залишаться збережені в хмарі'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
+                                          child: Text(loc.cancel),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
+                                          child: Text(loc.logout),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true && context.mounted) {
+                                    await AuthService().signOut();
+                                    final prefs =
+                                        await SharedPreferences.getInstance();
+                                    await prefs.remove('auth_skipped');
+                                    if (context.mounted) {
+                                      Navigator.of(context)
+                                          .popUntil((route) => route.isFirst);
+                                    }
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
                         );
                       } else {
                         return Card(
                           child: ListTile(
-                            leading: const Icon(Icons.cloud_off),
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.orange,
+                              child: const Icon(Icons.cloud_off,
+                                  color: Colors.white),
+                            ),
                             title: Text(loc.localMode),
                             subtitle: Text(loc.localModeDesc),
-                            trailing: TextButton(
+                            trailing: ElevatedButton(
                               onPressed: () async {
                                 final prefs =
                                     await SharedPreferences.getInstance();
@@ -5615,43 +6668,132 @@ class ProfilePage extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildStatCard(
-    BuildContext context,
-    IconData icon,
-    String value,
-    String label,
-    Color color,
-  ) {
-    return Card(
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Icon(icon, size: 32, color: color),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+// Нова сторінка для досягнень
+class AchievementsPage extends StatelessWidget {
+  final int totalTasks;
+  final int completedTasks;
+  final int habitsCount;
+
+  const AchievementsPage({
+    super.key,
+    required this.totalTasks,
+    required this.completedTasks,
+    required this.habitsCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(loc.achievements),
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24.0),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Theme.of(context).colorScheme.primary,
+                      Theme.of(context).colorScheme.secondary,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.emoji_events,
+                      size: 64,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      loc.achievements,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_unlockedCount()} з ${_totalAchievements()} розблоковано',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
+              const SizedBox(height: 24),
+              Text(
+                'Ваші досягнення',
+                style: Theme.of(context).textTheme.titleLarge,
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              _buildAchievementCard(
+                context,
+                Icons.workspace_premium,
+                loc.beginner,
+                loc.beginnerDesc,
+                totalTasks > 0,
+              ),
+              const SizedBox(height: 12),
+              _buildAchievementCard(
+                context,
+                Icons.military_tech,
+                loc.productive,
+                loc.productiveDesc,
+                completedTasks >= 10,
+              ),
+              const SizedBox(height: 12),
+              _buildAchievementCard(
+                context,
+                Icons.emoji_events,
+                loc.master,
+                loc.masterDesc,
+                completedTasks >= 50,
+              ),
+              const SizedBox(height: 12),
+              _buildAchievementCard(
+                context,
+                Icons.favorite,
+                loc.habitMaster,
+                loc.habitMasterDesc,
+                habitsCount >= 5,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+
+  int _unlockedCount() {
+    int count = 0;
+    if (totalTasks > 0) count++;
+    if (completedTasks >= 10) count++;
+    if (completedTasks >= 50) count++;
+    if (habitsCount >= 5) count++;
+    return count;
+  }
+
+  int _totalAchievements() => 4;
 
   Widget _buildAchievementCard(
     BuildContext context,
@@ -5665,26 +6807,36 @@ class ProfilePage extends StatelessWidget {
       child: Opacity(
         opacity: unlocked ? 1.0 : 0.5,
         child: ListTile(
+          contentPadding: const EdgeInsets.all(16),
           leading: CircleAvatar(
+            radius: 30,
             backgroundColor: unlocked
                 ? Theme.of(context).colorScheme.primary
                 : Colors.grey.shade300,
             child: Icon(
               icon,
+              size: 30,
               color: unlocked ? Colors.white : Colors.grey.shade500,
             ),
           ),
           title: Text(
             title,
             style: TextStyle(
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: unlocked ? null : Colors.grey.shade600,
             ),
           ),
-          subtitle: Text(description),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              description,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
           trailing: unlocked
-              ? const Icon(Icons.check_circle, color: Colors.green)
-              : const Icon(Icons.lock_outline, color: Colors.grey),
+              ? const Icon(Icons.check_circle, color: Colors.green, size: 32)
+              : const Icon(Icons.lock_outline, color: Colors.grey, size: 32),
         ),
       ),
     );
@@ -5835,9 +6987,17 @@ class _SettingsPageState extends State<SettingsPage> {
                 trailing: Radio<ThemeMode>(
                   value: ThemeMode.light,
                   groupValue: widget.themeMode,
-                  onChanged: (v) => widget.onThemeChanged(v!),
+                  onChanged: (v) {
+                    if (v != null) {
+                      widget.onThemeChanged(v);
+                      setState(() {});
+                    }
+                  },
                 ),
-                onTap: () => widget.onThemeChanged(ThemeMode.light),
+                onTap: () {
+                  widget.onThemeChanged(ThemeMode.light);
+                  setState(() {});
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.dark_mode),
@@ -5845,9 +7005,17 @@ class _SettingsPageState extends State<SettingsPage> {
                 trailing: Radio<ThemeMode>(
                   value: ThemeMode.dark,
                   groupValue: widget.themeMode,
-                  onChanged: (v) => widget.onThemeChanged(v!),
+                  onChanged: (v) {
+                    if (v != null) {
+                      widget.onThemeChanged(v);
+                      setState(() {});
+                    }
+                  },
                 ),
-                onTap: () => widget.onThemeChanged(ThemeMode.dark),
+                onTap: () {
+                  widget.onThemeChanged(ThemeMode.dark);
+                  setState(() {});
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.phone_android),
@@ -5855,9 +7023,17 @@ class _SettingsPageState extends State<SettingsPage> {
                 trailing: Radio<ThemeMode>(
                   value: ThemeMode.system,
                   groupValue: widget.themeMode,
-                  onChanged: (v) => widget.onThemeChanged(v!),
+                  onChanged: (v) {
+                    if (v != null) {
+                      widget.onThemeChanged(v);
+                      setState(() {});
+                    }
+                  },
                 ),
-                onTap: () => widget.onThemeChanged(ThemeMode.system),
+                onTap: () {
+                  widget.onThemeChanged(ThemeMode.system);
+                  setState(() {});
+                },
               ),
             ],
           ),

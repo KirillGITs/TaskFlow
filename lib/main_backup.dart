@@ -155,6 +155,7 @@ class TaskListPage extends StatefulWidget {
 
 class _TaskListPageState extends State<TaskListPage> {
   final List<TaskItem> _items = [];
+  final List<TaskItem> _archived = [];
   String _search = '';
 
   // Dialog controllers
@@ -182,11 +183,15 @@ class _TaskListPageState extends State<TaskListPage> {
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     final tasksJson = prefs.getStringList('tasks') ?? [];
+    final archivedJson = prefs.getStringList('archived') ?? [];
 
     setState(() {
       _items.clear();
       _items.addAll(
           tasksJson.map((s) => TaskItem.fromMap(jsonDecode(s))).toList());
+      _archived.clear();
+      _archived.addAll(
+          archivedJson.map((s) => TaskItem.fromMap(jsonDecode(s))).toList());
     });
   }
 
@@ -194,6 +199,8 @@ class _TaskListPageState extends State<TaskListPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(
         'tasks', _items.map((t) => jsonEncode(t.toMap())).toList());
+    await prefs.setStringList(
+        'archived', _archived.map((t) => jsonEncode(t.toMap())).toList());
   }
 
   void _resetDialogFields() {
@@ -295,10 +302,8 @@ class _TaskListPageState extends State<TaskListPage> {
                             value: c, child: Text(categoryLabel(c))))
                         .toList(),
                     onChanged: (c) {
-                      setDialogState(
-                          () => _selectedCategory = c ?? TaskCategory.other);
-                      setState(
-                          () => _selectedCategory = c ?? TaskCategory.other);
+                      setDialogState(() => _selectedCategory = c ?? TaskCategory.other);
+                      setState(() => _selectedCategory = c ?? TaskCategory.other);
                     },
                   ),
                 ),
@@ -346,8 +351,9 @@ class _TaskListPageState extends State<TaskListPage> {
                       : '📅 Do: ${_selectedDueDate!.day}.${_selectedDueDate!.month}.${_selectedDueDate!.year}'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 48),
-                    backgroundColor:
-                        _selectedDueDate != null ? Colors.green.shade50 : null,
+                    backgroundColor: _selectedDueDate != null
+                        ? Colors.green.shade50
+                        : null,
                   ),
                   onPressed: () async {
                     final date = await showDatePicker(
@@ -463,6 +469,11 @@ class _TaskListPageState extends State<TaskListPage> {
                     builder: (context) => SettingsPage(
                       themeMode: widget.themeMode,
                       onThemeChanged: widget.onThemeChanged,
+                      archivedCount: _archived.length,
+                      onClearArchived: () {
+                        setState(() => _archived.clear());
+                        _saveData();
+                      },
                     ),
                   ),
                 );
@@ -509,10 +520,10 @@ class _TaskListPageState extends State<TaskListPage> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildStatCard('Wszystkie', total.toString(), Icons.list_alt),
-                _buildStatCard('Do zrobienia',
-                    (total - completedCount).toString(), Icons.pending_actions),
-                _buildStatCard(
-                    'Ukończone', completedCount.toString(), Icons.check_circle),
+                _buildStatCard('Do zrobienia', (total - completedCount).toString(),
+                    Icons.pending_actions),
+                _buildStatCard('Ukończone', completedCount.toString(),
+                    Icons.check_circle),
               ],
             ),
           ),
@@ -562,6 +573,7 @@ class _TaskListPageState extends State<TaskListPage> {
                         onDismissed: (_) {
                           setState(() {
                             _items.remove(item);
+                            _archived.add(item);
                           });
                           _saveData();
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -571,6 +583,7 @@ class _TaskListPageState extends State<TaskListPage> {
                                 label: 'Cofnij',
                                 onPressed: () {
                                   setState(() {
+                                    _archived.remove(item);
                                     _items.insert(index, item);
                                   });
                                   _saveData();
@@ -608,10 +621,9 @@ class _TaskListPageState extends State<TaskListPage> {
                                   Text(
                                     '📅 ${item.dueDate!.day}.${item.dueDate!.month}.${item.dueDate!.year}',
                                     style: TextStyle(
-                                      color:
-                                          item.dueDate!.isBefore(DateTime.now())
-                                              ? Colors.red
-                                              : Colors.blue,
+                                      color: item.dueDate!.isBefore(DateTime.now())
+                                          ? Colors.red
+                                          : Colors.blue,
                                     ),
                                   ),
                               ],
@@ -675,11 +687,15 @@ class _TaskListPageState extends State<TaskListPage> {
 class SettingsPage extends StatelessWidget {
   final ThemeMode themeMode;
   final Function(ThemeMode) onThemeChanged;
+  final int archivedCount;
+  final VoidCallback onClearArchived;
 
   const SettingsPage({
     super.key,
     required this.themeMode,
     required this.onThemeChanged,
+    required this.archivedCount,
+    required this.onClearArchived,
   });
 
   @override
@@ -714,6 +730,16 @@ class SettingsPage extends StatelessWidget {
             value: ThemeMode.system,
             groupValue: themeMode,
             onChanged: (mode) => onThemeChanged(mode!),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.delete_sweep),
+            title: const Text('Wyczyść archiwum'),
+            subtitle: Text('Archiwum: $archivedCount zadań'),
+            trailing: ElevatedButton(
+              onPressed: archivedCount == 0 ? null : onClearArchived,
+              child: const Text('Wyczyść'),
+            ),
           ),
         ],
       ),

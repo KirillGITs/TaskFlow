@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -6,42 +6,204 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'firebase_options.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+Future<void> initNotifications() async {
+  tz.initializeTimeZones();
+
+  // Отримуємо часову зону пристрою
+  try {
+    final timezoneInfo = await FlutterTimezone.getLocalTimezone();
+    final String timeZoneName = timezoneInfo.identifier;
+    debugPrint('Device timezone: $timeZoneName');
+    tz.setLocalLocation(tz.getLocation(timeZoneName));
+  } catch (e) {
+    debugPrint('Error getting timezone: $e, using UTC');
+    tz.setLocalLocation(tz.UTC);
+  }
+
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+
+  const DarwinInitializationSettings initializationSettingsIOS =
+      DarwinInitializationSettings(
+    requestAlertPermission: true,
+    requestBadgePermission: true,
+    requestSoundPermission: true,
+  );
+
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+    iOS: initializationSettingsIOS,
+  );
+
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+  // Запит дозволу для Android 13+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.requestNotificationsPermission();
+
+  // Запит дозволу на точні нагадування
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.requestExactAlarmsPermission();
+}
+
+Future<void> scheduleNotification({
+  required int id,
+  required String title,
+  required String body,
+  required DateTime scheduledDate,
+}) async {
+  final now = DateTime.now();
+  debugPrint(
+      'scheduleNotification called: scheduledDate=$scheduledDate, now=$now');
+
+  if (scheduledDate.isBefore(now)) {
+    debugPrint('Notification skipped - date is in past: $scheduledDate');
+    return;
+  }
+
+  // Рахуємо різницю в секундах
+  final difference = scheduledDate.difference(now);
+  debugPrint('Notification will fire in ${difference.inSeconds} seconds');
+
+  // Створюємо TZDateTime додаючи різницю до поточного часу
+  final tzScheduledDate = tz.TZDateTime.now(tz.local).add(difference);
+  debugPrint('Scheduling notification for: $tzScheduledDate');
+
+  try {
+    await flutterLocalNotificationsPlugin.zonedSchedule(
+      id,
+      title,
+      body,
+      tzScheduledDate,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'task_reminders',
+          'Нагадування про завдання',
+          channelDescription: 'Сповіщення про заплановані завдання',
+          importance: Importance.max,
+          priority: Priority.max,
+          icon: '@mipmap/ic_launcher',
+          playSound: true,
+          enableVibration: true,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+    debugPrint('Notification scheduled successfully with zonedSchedule!');
+  } catch (e) {
+    debugPrint('zonedSchedule failed: $e, using Future.delayed fallback');
+    // Fallback до Future.delayed
+    Future.delayed(difference, () async {
+      debugPrint('Showing notification now (fallback)!');
+      await flutterLocalNotificationsPlugin.show(
+        id,
+        title,
+        body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'task_reminders',
+            'Нагадування про завдання',
+            channelDescription: 'Сповіщення про заплановані завдання',
+            importance: Importance.max,
+            priority: Priority.max,
+            icon: '@mipmap/ic_launcher',
+            playSound: true,
+            enableVibration: true,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+      );
+    });
+  }
+}
+
+Future<void> cancelNotification(int id) async {
+  await flutterLocalNotificationsPlugin.cancel(id);
+}
+
+Future<void> showTestNotification() async {
+  await flutterLocalNotificationsPlugin.show(
+    0,
+    'Тестове сповіщення',
+    'Сповіщення працюють!',
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'task_reminders',
+        'Нагадування про завдання',
+        channelDescription: 'Сповіщення про заплановані завдання',
+        importance: Importance.max,
+        priority: Priority.max,
+        icon: '@mipmap/ic_launcher',
+        playSound: true,
+        enableVibration: true,
+      ),
+      iOS: DarwinNotificationDetails(),
+    ),
+  );
+  debugPrint('Test notification shown!');
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    // Firebase initialization failed - app will work in local-only mode
-    debugPrint('Firebase initialization failed: $e');
-  }
+
+  await initNotifications();
+
+  await Supabase.initialize(
+    url: 'https://xsvfvckfrvlapldkhsgl.supabase.co',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzdmZ2Y2tmcnZsYXBsZGtoc2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNDM2NzUsImV4cCI6MjA4MzkxOTY3NX0.yDIN34sgspml23Y2f_lmkuqCPFC917jdizp5TJoPKWc',
+  );
+
   runApp(const TaskManagerApp());
 }
 
 enum TaskCategory { work, personal, home, other }
 
-enum HabitFrequency { daily, weekly, monthly }
+enum HabitFrequency { daily, weekly }
+
+enum TaskPriority { low, medium, high }
+
+Color getPriorityColor(TaskPriority? priority) {
+  switch (priority) {
+    case TaskPriority.low:
+      return Colors.blue;
+    case TaskPriority.medium:
+      return Colors.orange;
+    case TaskPriority.high:
+      return Colors.red;
+    case null:
+      return Colors.grey;
+  }
+}
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final SupabaseClient _supabase = Supabase.instance.client;
 
-  User? get currentUser => _auth.currentUser;
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  User? get currentUser => _supabase.auth.currentUser;
+  Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
 
-  Future<UserCredential?> signUp(String email, String password) async {
+  Future<AuthResponse?> signUp(String email, String password) async {
     try {
-      return await _auth.createUserWithEmailAndPassword(
+      return await _supabase.auth.signUp(
         email: email,
         password: password,
       );
@@ -50,146 +212,39 @@ class AuthService {
     }
   }
 
-  Future<UserCredential?> signIn(String email, String password) async {
+  Future<AuthResponse?> signIn(String email, String password) async {
     try {
-      return await _auth.signInWithEmailAndPassword(
+      return await _supabase.auth.signInWithPassword(
         email: email,
         password: password,
       );
     } catch (e) {
       rethrow;
-    }
-  }
-
-  Future<UserCredential?> signInWithGoogle() async {
-    try {
-      // Перевірка чи Firebase ініціалізовано
-      if (Firebase.apps.isEmpty) {
-        throw Exception(
-            'Firebase не ініціалізовано. Будь ласка, налаштуйте Firebase згідно з інструкцією у FIREBASE_SETUP.md');
-      }
-
-      // Отримуємо Web Client ID з Firebase options для Web
-      String? webClientId =
-          '200804731302-jqbp4asrj484dvop63nirnhei78c6lp1.apps.googleusercontent.com';
-
-      // Trigger the authentication flow
-      final GoogleSignInAccount? googleUser = await GoogleSignIn(
-        scopes: ['email'],
-        // Передаємо clientId для Web
-        clientId: webClientId,
-      ).signIn();
-
-      if (googleUser == null) {
-        // User canceled the sign-in
-        return null;
-      }
-
-      // Obtain the auth details from the request
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      // Create a new credential
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      // Sign in to Firebase with the Google credential
-      return await _auth.signInWithCredential(credential);
-    } on FirebaseAuthException catch (e) {
-      // Firebase authentication помилки
-      debugPrint('Firebase Auth Error: ${e.code} - ${e.message}');
-      throw Exception(_getFirebaseErrorMessage(e.code));
-    } catch (e) {
-      // Інші помилки
-      debugPrint('Google Sign-In Error: $e');
-
-      // OAuth client помилка (401: invalid_client)
-      if (e.toString().contains('invalid_client') ||
-          e.toString().contains('OAuth client was not found') ||
-          e.toString().contains('401')) {
-        throw Exception('🔐 Google Sign-In не налаштовано!\n\n'
-            '❌ Помилка: OAuth client не знайдено\n\n'
-            '✅ Як виправити:\n\n'
-            '1️⃣ Створіть Firebase проект:\n'
-            '   → https://console.firebase.google.com/\n\n'
-            '2️⃣ Увімкніть Google Sign-In:\n'
-            '   → Authentication → Sign-in method → Google → Enable\n\n'
-            '3️⃣ Налаштуйте проект:\n'
-            '   → flutterfire configure\n\n'
-            '4️⃣ Для Web (якщо використовуєте Chrome):\n'
-            '   → Додайте Client ID у web/index.html\n'
-            '   → Детально: WEB_SETUP.md\n\n'
-            '💡 Альтернатива:\n'
-            '   • Натисніть "Продовжити без акаунта"\n'
-            '   • Або використайте Email/Пароль\n\n'
-            '📖 Повна інструкція: FIREBASE_SETUP.md');
-      }
-
-      // Спеціальна обробка для Web
-      if (e.toString().contains('ClientID not set') ||
-          e.toString().contains('appClientId')) {
-        throw Exception('Google Sign-In для Web не налаштовано.\n\n'
-            'Для використання на Web:\n'
-            '1. Створіть Firebase проект\n'
-            '2. Виконайте: flutterfire configure\n'
-            '3. Оновіть web/index.html з вашим Client ID\n\n'
-            'Детальна інструкція у файлі WEB_SETUP.md\n\n'
-            'Альтернатива: використайте мобільний додаток (Android/iOS) '
-            'або натисніть "Продовжити без акаунта"');
-      }
-
-      if (e.toString().contains('API key not valid') ||
-          e.toString().contains('INVALID_API_KEY')) {
-        throw Exception(
-            'Firebase API ключ недійсний.\n\nБудь ласка, налаштуйте Firebase:\n1. Створіть проект на console.firebase.google.com\n2. Виконайте: flutterfire configure\n3. Перезапустіть додаток\n\nДетальна інструкція у файлі FIREBASE_SETUP.md');
-      }
-      rethrow;
-    }
-  }
-
-  String _getFirebaseErrorMessage(String code) {
-    switch (code) {
-      case 'account-exists-with-different-credential':
-        return 'Акаунт з цією поштою вже існує з іншим методом входу';
-      case 'invalid-credential':
-        return 'Невірні дані для входу. Перевірте налаштування Firebase';
-      case 'operation-not-allowed':
-        return '🔐 Google Sign-In не увімкнено!\n\n'
-            'Увімкніть у Firebase Console:\n'
-            '1. Authentication → Sign-in method\n'
-            '2. Google → Enable → Save\n\n'
-            'Детальна інструкція: FIREBASE_SETUP.md';
-      case 'user-disabled':
-        return 'Цей акаунт був деактивований';
-      case 'user-not-found':
-        return 'Користувача не знайдено';
-      case 'wrong-password':
-        return 'Невірний пароль';
-      case 'invalid-api-key':
-        return 'Невірний Firebase API ключ. Налаштуйте Firebase згідно з FIREBASE_SETUP.md';
-      default:
-        return 'Помилка входу: $code';
     }
   }
 
   Future<void> signOut() async {
-    await GoogleSignIn().signOut();
-    await _auth.signOut();
+    await _supabase.auth.signOut();
   }
 
   Future<void> syncToCloud(Map<String, dynamic> data) async {
     if (currentUser != null) {
-      await _firestore.collection('users').doc(currentUser!.uid).set(data);
+      await _supabase.from('user_data').upsert({
+        'user_id': currentUser!.id,
+        'data': data,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
     }
   }
 
   Future<Map<String, dynamic>?> loadFromCloud() async {
     if (currentUser != null) {
-      final doc =
-          await _firestore.collection('users').doc(currentUser!.uid).get();
-      return doc.data();
+      final response = await _supabase
+          .from('user_data')
+          .select('data')
+          .eq('user_id', currentUser!.id)
+          .maybeSingle();
+      return response?['data'] as Map<String, dynamic>?;
     }
     return null;
   }
@@ -290,6 +345,10 @@ class AppLocalizations {
       'cancel': 'Anuluj',
       'add': 'Dodaj',
       'delete': 'Usuń',
+      'edit': 'Edytuj',
+      'priority_low': 'Niski',
+      'priority_medium': 'Średni',
+      'priority_high': 'Wysoki',
       'total': 'Razem',
       'to_do': 'Do zrobienia',
       'completed': 'Ukończonych',
@@ -361,6 +420,7 @@ class AppLocalizations {
           'Czy na pewno chcesz usunąć wszystkie zarchiwizowane zadania?',
       'notifications': 'Powiadomienia',
       'enable_notifications': 'Włącz powiadomienia',
+      'notifications_subtitle': 'Otrzymuj przypomnienia o zadaniach',
       'notification_sound': 'Dźwięk powiadomień',
       'notification_time': 'Czas powiadomienia',
       'general': 'Ogólne',
@@ -409,6 +469,18 @@ class AppLocalizations {
       'master_desc': 'Wykonaj 50 zadań',
       'habit_master': 'Mistrz nawyków',
       'habit_master_desc': 'Stwórz 5 nawyków',
+      'night_owl': 'Nocny marek',
+      'night_owl_desc': 'Utwórz zadanie po 22:00',
+      'early_bird': 'Ranny ptaszek',
+      'early_bird_desc': 'Ukończ zadanie przed 8:00',
+      'perfectionist': 'Perfekcjonista',
+      'perfectionist_desc': 'Ukończ 100 zadań',
+      'streak_master': 'Mistrz serii',
+      'streak_master_desc': 'Utrzymaj nawyk przez 7 dni z rzędu',
+      'speed_runner': 'Szybki start',
+      'speed_runner_desc': 'Ukończ zadanie w dniu utworzenia',
+      'collector': 'Kolekcjoner',
+      'collector_desc': 'Odblokuj wszystkie pozostałe osiągnięcia',
       'account': 'Konto',
       'local_mode': 'Tryb lokalny',
       'local_mode_desc': 'Dane przechowywane tylko na tym urządzeniu',
@@ -421,6 +493,24 @@ class AppLocalizations {
       'or': 'lub',
       'enter_image_url': 'Wprowadź URL zdjęcia',
       'image_url_hint': 'Wklej link do obrazka z internetu',
+      'default_task_name': 'Zadanie',
+      'select_days': 'Wybierz dni:',
+      'icon': 'Ikona:',
+      'edit_habit': 'Edytuj nawyk',
+      'remove': 'Usuń',
+      'continue_without_account': 'Kontynuuj bez konta',
+      'pick_from_gallery': 'Wybierz z galerii',
+      'take_photo': 'Zrób zdjęcie',
+      'delete_avatar': 'Usuń awatar',
+      'change_name': 'Zmień imię',
+      'save': 'Zapisz',
+      'email': 'Email',
+      'cloud_sync': 'Dane synchronizowane z chmurą',
+      'logout_from_account': 'Wyloguj się z konta',
+      'logout_confirmation': 'Wylogować się z konta?',
+      'select_date': 'Wybierz datę',
+      'not_selected': 'Nie wybrano',
+      'your_achievements': 'Twoje osiągnięcia',
     },
     'uk': {
       'app_title': 'TaskFlow',
@@ -443,6 +533,10 @@ class AppLocalizations {
       'cancel': 'Скасувати',
       'add': 'Додати',
       'delete': 'Видалити',
+      'edit': 'Редагувати',
+      'priority_low': 'Низький',
+      'priority_medium': 'Середній',
+      'priority_high': 'Високий',
       'total': 'Всього',
       'to_do': 'До виконання',
       'completed': 'Виконано',
@@ -514,6 +608,7 @@ class AppLocalizations {
           'Ви впевнені, що хочете видалити всі заархівовані завдання?',
       'notifications': 'Сповіщення',
       'enable_notifications': 'Увімкнути сповіщення',
+      'notifications_subtitle': 'Отримувати нагадування про завдання',
       'notification_sound': 'Звук сповіщень',
       'notification_time': 'Час сповіщення',
       'general': 'Загальні',
@@ -562,6 +657,18 @@ class AppLocalizations {
       'master_desc': 'Виконайте 50 задач',
       'habit_master': 'Майстер звичок',
       'habit_master_desc': 'Створіть 5 звичок',
+      'night_owl': 'Нічна сова',
+      'night_owl_desc': 'Створіть задачу після 22:00',
+      'early_bird': 'Рання пташка',
+      'early_bird_desc': 'Завершіть задачу до 8:00',
+      'perfectionist': 'Перфекціоніст',
+      'perfectionist_desc': 'Виконайте 100 задач',
+      'streak_master': 'Майстер серій',
+      'streak_master_desc': 'Виконуйте звичку 7 днів поспіль',
+      'speed_runner': 'Швидкий старт',
+      'speed_runner_desc': 'Виконайте задачу в день створення',
+      'collector': 'Колекціонер',
+      'collector_desc': 'Розблокуйте всі інші досягнення',
       'account': 'Акаунт',
       'local_mode': 'Локальний режим',
       'local_mode_desc': 'Дані зберігаються лише на цьому пристрої',
@@ -574,162 +681,24 @@ class AppLocalizations {
       'or': 'або',
       'enter_image_url': 'Введіть URL зображення',
       'image_url_hint': 'Вставте посилання на зображення з інтернету',
-    },
-    'ru': {
-      'app_title': 'TaskFlow',
-      'tasks': 'Задачи',
-      'calendar': 'Календарь',
-      'habits': 'Привычки',
-      'settings': 'Настройки',
-      'add_task': 'Добавить задачу',
-      'add_habit': 'Добавить привычку',
-      'task_name': 'Название задачи',
-      'priority': 'Приоритет',
-      'notes': 'Заметки',
-      'note': 'Заметка',
-      'category': 'Категория',
-      'categories': 'Категории',
-      'add_category': 'Добавить категорию',
-      'manage_categories': 'Управление категориями',
-      'image_url': 'URL изображения (опционально)',
-      'add_reminder': 'Добавить напоминание',
-      'reminder': 'Напоминание',
-      'favorites': 'Избранные',
-      'favorite': 'Избранное',
-      'cancel': 'Отмена',
-      'add': 'Добавить',
-      'delete': 'Удалить',
-      'total': 'Всего',
-      'to_do': 'К выполнению',
-      'completed': 'Выполнено',
-      'search_task': 'Искать задачу...',
-      'search': 'Искать',
-      'empty_list': 'Список пуст',
-      'add_first_task': 'Добавьте первую задачу кнопкой +',
-      'task_deleted': 'Задача удалена',
-      'deleted_task': 'Удалена задача',
-      'undo': 'Отменить',
-      'archive': 'В архиве',
-      'due': 'До',
-      'work': 'Работа',
-      'personal': 'Личное',
-      'home': 'Дом',
-      'other': 'Другое',
-      'daily': 'Ежедневно',
-      'weekly': 'Еженедельно',
-      'monthly': 'Ежемесячно',
-      'appearance': 'Внешний вид',
-      'light_theme': 'Светлая тема',
-      'dark_theme': 'Темная тема',
-      'system_theme': 'Системная тема',
-      'data': 'Данные',
-      'statistics': 'Статистика',
-      'tasks_count': 'Количество задач',
-      'total_tasks': 'Задач всего',
-      'completed_tasks': 'Выполнено',
-      'archived_tasks': 'архивированных задач',
-      'in_archive': 'В архиве',
-      'clear_tasks': 'Очистить список задач',
-      'clear_archive': 'Очистить архив',
-      'delete_all_tasks': 'Удалить все задачи из списка',
-      'about': 'О приложении',
-      'version': 'Версия 2.1.0',
-      'your_task_list': 'Ваш список задач',
-      'language': 'Язык',
-      'month_stats': 'Статистика месяца',
-      'month_statistics': 'Статистика месяца',
-      'tasks_total': 'Задач всего',
-      'progress': 'Прогресс',
-      'no_tasks_today': 'Нет задач на сегодня',
-      'selected_day_tasks': 'Задачи выбранного дня',
-      'no_habits': 'Нет привычек',
-      'add_first_habit': 'Добавьте первую привычку кнопкой +',
-      'streak': 'Серия',
-      'days': 'дней',
-      'pomodoro': 'Pomodoro',
-      'work_session': 'Рабочая сессия',
-      'break_session': 'Перерыв',
-      'long_break': 'Длинный перерыв',
-      'start': 'Старт',
-      'pause': 'Пауза',
-      'resume': 'Продолжить',
-      'reset': 'Сбросить',
-      'session': 'Сессия',
-      'sessions_completed': 'Сессий завершено',
-      'focus_time': 'Время работы',
-      'break_time': 'Время перерыва',
-      'inbox': 'Входящие',
-      'inbox_desc': 'Все новые задачи',
-      'today': 'Сегодня',
-      'today_desc': 'Задачи на сегодня',
-      'habit_name': 'Название привычки',
-      'description': 'Описание (опционально)',
-      'frequency': 'Частота',
-      'confirm_clear_tasks': 'Вы уверены, что хотите удалить все задачи?',
-      'confirm_clear_archive':
-          'Вы уверены, что хотите удалить все архивированные задачи?',
-      'notifications': 'Уведомления',
-      'enable_notifications': 'Включить уведомления',
-      'notification_sound': 'Звук уведомлений',
-      'notification_time': 'Время уведомления',
-      'general': 'Общие',
-      'auto_archive': 'Автоматическая архивация',
-      'auto_archive_desc': 'Архивировать выполненные задачи через 7 дней',
-      'show_completed': 'Показать выполненные',
-      'show_completed_desc': 'Отображать выполненные задачи в списке',
-      'backup': 'Резервная копия',
-      'export_data': 'Экспортировать данные',
-      'import_data': 'Импортировать данные',
-      'backup_desc': 'Сохранить все данные в файл',
-      'advanced': 'Расширенные',
-      'developer_mode': 'Режим разработчика',
-      'show_debug_info': 'Показать отладочную информацию',
-      'reset_app': 'Сбросить приложение',
-      'reset_app_desc': 'Восстановить настройки по умолчанию',
-      'mon': 'Пн',
-      'tue': 'Вт',
-      'wed': 'Ср',
-      'thu': 'Чт',
-      'fri': 'Пт',
-      'sat': 'Сб',
-      'sun': 'Вс',
-      'january': 'Январь',
-      'february': 'Февраль',
-      'march': 'Март',
-      'april': 'Апрель',
-      'may': 'Май',
-      'june': 'Июнь',
-      'july': 'Июль',
-      'august': 'Август',
-      'september': 'Сентябрь',
-      'october': 'Октябрь',
-      'november': 'Ноябрь',
-      'december': 'Декабрь',
-      'profile': 'Профиль',
-      'my_profile': 'Мой профиль',
-      'user': 'Пользователь',
-      'tasks_completed': 'задач выполнено',
-      'achievements': 'Достижения',
-      'beginner': 'Новичок',
-      'beginner_desc': 'Создайте первую задачу',
-      'productive': 'Продуктивный',
-      'productive_desc': 'Выполните 10 задач',
-      'master': 'Мастер',
-      'master_desc': 'Выполните 50 задач',
-      'habit_master': 'Мастер привычек',
-      'habit_master_desc': 'Создайте 5 привычек',
-      'account': 'Аккаунт',
-      'local_mode': 'Локальный режим',
-      'local_mode_desc': 'Данные хранятся только на этом устройстве',
-      'login': 'Войти',
-      'logout': 'Выйти',
-      'add_photo': 'Добавить фото',
-      'photo_selected': 'Фото выбрано',
-      'select_photo': 'Выбрать фото из галереи',
-      'remove_photo': 'Удалить фото',
-      'or': 'или',
-      'enter_image_url': 'Введите URL изображения',
-      'image_url_hint': 'Вставьте ссылку на изображение из интернета',
+      'default_task_name': 'Завдання',
+      'select_days': 'Виберіть дні:',
+      'icon': 'Іконка:',
+      'edit_habit': 'Редагувати звичку',
+      'remove': 'Прибрати',
+      'continue_without_account': 'Продовжити без акаунта',
+      'pick_from_gallery': 'Вибрати з галереї',
+      'take_photo': 'Зробити фото',
+      'delete_avatar': 'Видалити аватарку',
+      'change_name': 'Змінити ім\'я',
+      'save': 'Зберегти',
+      'email': 'Email',
+      'cloud_sync': 'Дані синхронізуються з хмарою',
+      'logout_from_account': 'Вийти з акаунту',
+      'logout_confirmation': 'Вийти з акаунту?',
+      'select_date': 'Вибрати дату',
+      'not_selected': 'Не вибрано',
+      'your_achievements': 'Ваші досягнення',
     },
     'en': {
       'app_title': 'TaskFlow',
@@ -755,6 +724,10 @@ class AppLocalizations {
       'cancel': 'Cancel',
       'add': 'Add',
       'delete': 'Delete',
+      'edit': 'Edit',
+      'priority_low': 'Low',
+      'priority_medium': 'Medium',
+      'priority_high': 'High',
       'total': 'Total',
       'to_do': 'To do',
       'completed': 'Completed',
@@ -826,6 +799,7 @@ class AppLocalizations {
           'Are you sure you want to delete all archived tasks?',
       'notifications': 'Notifications',
       'enable_notifications': 'Enable notifications',
+      'notifications_subtitle': 'Receive reminders about tasks',
       'notification_sound': 'Notification sound',
       'notification_time': 'Notification time',
       'general': 'General',
@@ -874,6 +848,18 @@ class AppLocalizations {
       'master_desc': 'Complete 50 tasks',
       'habit_master': 'Habit Master',
       'habit_master_desc': 'Create 5 habits',
+      'night_owl': 'Night Owl',
+      'night_owl_desc': 'Create a task after 10 PM',
+      'early_bird': 'Early Bird',
+      'early_bird_desc': 'Complete a task before 8 AM',
+      'perfectionist': 'Perfectionist',
+      'perfectionist_desc': 'Complete 100 tasks',
+      'streak_master': 'Streak Master',
+      'streak_master_desc': 'Keep a habit for 7 days in a row',
+      'speed_runner': 'Speed Runner',
+      'speed_runner_desc': 'Complete a task on the same day',
+      'collector': 'Collector',
+      'collector_desc': 'Unlock all other achievements',
       'account': 'Account',
       'local_mode': 'Local mode',
       'local_mode_desc': 'Data stored only on this device',
@@ -886,6 +872,24 @@ class AppLocalizations {
       'or': 'or',
       'enter_image_url': 'Enter image URL',
       'image_url_hint': 'Paste image link from internet',
+      'default_task_name': 'Task',
+      'select_days': 'Select days:',
+      'icon': 'Icon:',
+      'edit_habit': 'Edit habit',
+      'remove': 'Remove',
+      'continue_without_account': 'Continue without account',
+      'pick_from_gallery': 'Pick from gallery',
+      'take_photo': 'Take photo',
+      'delete_avatar': 'Delete avatar',
+      'change_name': 'Change name',
+      'save': 'Save',
+      'email': 'Email',
+      'cloud_sync': 'Data synced with cloud',
+      'logout_from_account': 'Logout from account',
+      'logout_confirmation': 'Logout from account?',
+      'select_date': 'Select date',
+      'not_selected': 'Not selected',
+      'your_achievements': 'Your achievements',
     },
     'de': {
       'app_title': 'TaskFlow',
@@ -911,6 +915,10 @@ class AppLocalizations {
       'cancel': 'Abbrechen',
       'add': 'Hinzufügen',
       'delete': 'Löschen',
+      'edit': 'Bearbeiten',
+      'priority_low': 'Niedrig',
+      'priority_medium': 'Mittel',
+      'priority_high': 'Hoch',
       'total': 'Gesamt',
       'to_do': 'Zu erledigen',
       'completed': 'Abgeschlossen',
@@ -983,6 +991,7 @@ class AppLocalizations {
           'Sind Sie sicher, dass Sie alle archivierten Aufgaben löschen möchten?',
       'notifications': 'Benachrichtigungen',
       'enable_notifications': 'Benachrichtigungen aktivieren',
+      'notifications_subtitle': 'Erinnerungen über Aufgaben erhalten',
       'notification_sound': 'Benachrichtigungston',
       'notification_time': 'Benachrichtigungszeit',
       'general': 'Allgemein',
@@ -1031,6 +1040,18 @@ class AppLocalizations {
       'master_desc': 'Erledige 50 Aufgaben',
       'habit_master': 'Gewohnheitsmeister',
       'habit_master_desc': 'Erstelle 5 Gewohnheiten',
+      'night_owl': 'Nachteule',
+      'night_owl_desc': 'Erstelle eine Aufgabe nach 22:00',
+      'early_bird': 'Frühaufsteher',
+      'early_bird_desc': 'Erledige eine Aufgabe vor 8:00',
+      'perfectionist': 'Perfektionist',
+      'perfectionist_desc': 'Erledige 100 Aufgaben',
+      'streak_master': 'Serien-Meister',
+      'streak_master_desc': 'Halte eine Gewohnheit 7 Tage am Stück',
+      'speed_runner': 'Schnellstarter',
+      'speed_runner_desc': 'Erledige eine Aufgabe am selben Tag',
+      'collector': 'Sammler',
+      'collector_desc': 'Schalte alle anderen Erfolge frei',
       'account': 'Konto',
       'local_mode': 'Lokaler Modus',
       'local_mode_desc': 'Daten nur auf diesem Gerät gespeichert',
@@ -1043,6 +1064,24 @@ class AppLocalizations {
       'or': 'oder',
       'enter_image_url': 'Bild-URL eingeben',
       'image_url_hint': 'Bildlink aus dem Internet einfügen',
+      'default_task_name': 'Aufgabe',
+      'select_days': 'Tage auswählen:',
+      'icon': 'Symbol:',
+      'edit_habit': 'Gewohnheit bearbeiten',
+      'remove': 'Entfernen',
+      'continue_without_account': 'Ohne Konto fortfahren',
+      'pick_from_gallery': 'Aus Galerie wählen',
+      'take_photo': 'Foto aufnehmen',
+      'delete_avatar': 'Avatar löschen',
+      'change_name': 'Namen ändern',
+      'save': 'Speichern',
+      'email': 'E-Mail',
+      'cloud_sync': 'Daten mit Cloud synchronisiert',
+      'logout_from_account': 'Vom Konto abmelden',
+      'logout_confirmation': 'Vom Konto abmelden?',
+      'select_date': 'Datum wählen',
+      'not_selected': 'Nicht ausgewählt',
+      'your_achievements': 'Ihre Erfolge',
     },
     'es': {
       'app_title': 'TaskFlow',
@@ -1068,6 +1107,10 @@ class AppLocalizations {
       'cancel': 'Cancelar',
       'add': 'Añadir',
       'delete': 'Eliminar',
+      'edit': 'Editar',
+      'priority_low': 'Baja',
+      'priority_medium': 'Media',
+      'priority_high': 'Alta',
       'total': 'Total',
       'to_do': 'Por hacer',
       'completed': 'Completado',
@@ -1140,6 +1183,7 @@ class AppLocalizations {
           '¿Estás seguro de que quieres eliminar todas las tareas archivadas?',
       'notifications': 'Notificaciones',
       'enable_notifications': 'Activar notificaciones',
+      'notifications_subtitle': 'Recibir recordatorios sobre tareas',
       'notification_sound': 'Sonido de notificación',
       'notification_time': 'Hora de notificación',
       'general': 'General',
@@ -1188,6 +1232,18 @@ class AppLocalizations {
       'master_desc': 'Completa 50 tareas',
       'habit_master': 'Maestro de hábitos',
       'habit_master_desc': 'Crea 5 hábitos',
+      'night_owl': 'Búho nocturno',
+      'night_owl_desc': 'Crea una tarea después de las 22:00',
+      'early_bird': 'Madrugador',
+      'early_bird_desc': 'Completa una tarea antes de las 8:00',
+      'perfectionist': 'Perfeccionista',
+      'perfectionist_desc': 'Completa 100 tareas',
+      'streak_master': 'Maestro de rachas',
+      'streak_master_desc': 'Mantén un hábito durante 7 días seguidos',
+      'speed_runner': 'Velocista',
+      'speed_runner_desc': 'Completa una tarea el mismo día',
+      'collector': 'Coleccionista',
+      'collector_desc': 'Desbloquea todos los demás logros',
       'account': 'Cuenta',
       'local_mode': 'Modo local',
       'local_mode_desc': 'Datos almacenados solo en este dispositivo',
@@ -1200,12 +1256,31 @@ class AppLocalizations {
       'or': 'o',
       'enter_image_url': 'Introducir URL de imagen',
       'image_url_hint': 'Pegar enlace de imagen de internet',
+      'default_task_name': 'Tarea',
+      'select_days': 'Seleccionar días:',
+      'icon': 'Icono:',
+      'edit_habit': 'Editar hábito',
+      'remove': 'Eliminar',
+      'continue_without_account': 'Continuar sin cuenta',
+      'pick_from_gallery': 'Elegir de la galería',
+      'take_photo': 'Tomar foto',
+      'delete_avatar': 'Eliminar avatar',
+      'change_name': 'Cambiar nombre',
+      'save': 'Guardar',
+      'email': 'Correo electrónico',
+      'cloud_sync': 'Datos sincronizados con la nube',
+      'logout_from_account': 'Cerrar sesión de la cuenta',
+      'logout_confirmation': '¿Cerrar sesión de la cuenta?',
+      'select_date': 'Seleccionar fecha',
+      'not_selected': 'No seleccionado',
+      'your_achievements': 'Tus logros',
     },
   };
 
   String translate(String key) {
     return _localizedValues[languageCode]?[key] ??
-        _localizedValues['en']![key]!;
+        _localizedValues['en']?[key] ??
+        key;
   }
 
   String get appTitle => translate('app_title');
@@ -1228,6 +1303,10 @@ class AppLocalizations {
   String get cancel => translate('cancel');
   String get add => translate('add');
   String get delete => translate('delete');
+  String get edit => translate('edit');
+  String get priorityLow => translate('priority_low');
+  String get priorityMedium => translate('priority_medium');
+  String get priorityHigh => translate('priority_high');
   String get total => translate('total');
   String get toDo => translate('to_do');
   String get completed => translate('completed');
@@ -1323,6 +1402,7 @@ class AppLocalizations {
 
   String get notifications => translate('notifications');
   String get enableNotifications => translate('enable_notifications');
+  String get notificationsSubtitle => translate('notifications_subtitle');
   String get notificationSound => translate('notification_sound');
   String get notificationTime => translate('notification_time');
   String get general => translate('general');
@@ -1354,6 +1434,18 @@ class AppLocalizations {
   String get masterDesc => translate('master_desc');
   String get habitMaster => translate('habit_master');
   String get habitMasterDesc => translate('habit_master_desc');
+  String get nightOwl => translate('night_owl');
+  String get nightOwlDesc => translate('night_owl_desc');
+  String get earlyBird => translate('early_bird');
+  String get earlyBirdDesc => translate('early_bird_desc');
+  String get perfectionist => translate('perfectionist');
+  String get perfectionistDesc => translate('perfectionist_desc');
+  String get streakMaster => translate('streak_master');
+  String get streakMasterDesc => translate('streak_master_desc');
+  String get speedRunner => translate('speed_runner');
+  String get speedRunnerDesc => translate('speed_runner_desc');
+  String get collector => translate('collector');
+  String get collectorDesc => translate('collector_desc');
   String get account => translate('account');
   String get localMode => translate('local_mode');
   String get localModeDesc => translate('local_mode_desc');
@@ -1366,6 +1458,24 @@ class AppLocalizations {
   String get or => translate('or');
   String get enterImageUrl => translate('enter_image_url');
   String get imageUrlHint => translate('image_url_hint');
+  String get defaultTaskName => translate('default_task_name');
+  String get selectDays => translate('select_days');
+  String get icon => translate('icon');
+  String get editHabit => translate('edit_habit');
+  String get remove => translate('remove');
+  String get continueWithoutAccount => translate('continue_without_account');
+  String get pickFromGallery => translate('pick_from_gallery');
+  String get takePhoto => translate('take_photo');
+  String get deleteAvatar => translate('delete_avatar');
+  String get changeName => translate('change_name');
+  String get save => translate('save');
+  String get email => translate('email');
+  String get cloudSync => translate('cloud_sync');
+  String get logoutFromAccount => translate('logout_from_account');
+  String get logoutConfirmation => translate('logout_confirmation');
+  String get selectDate => translate('select_date');
+  String get notSelected => translate('not_selected');
+  String get yourAchievements => translate('your_achievements');
 }
 
 class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
@@ -1405,8 +1515,6 @@ String frequencyLabel(HabitFrequency f, BuildContext context) {
       return l.daily;
     case HabitFrequency.weekly:
       return l.weekly;
-    case HabitFrequency.monthly:
-      return l.monthly;
   }
 }
 
@@ -1420,6 +1528,7 @@ class Habit {
   List<DateTime> completedDates;
   IconData icon;
   List<int> selectedDays; // 1=Monday, 7=Sunday
+  TimeOfDay? reminderTime; // Час нагадування
 
   Habit({
     String? id,
@@ -1431,6 +1540,7 @@ class Habit {
     List<DateTime>? completedDates,
     this.icon = Icons.check_circle,
     List<int>? selectedDays,
+    this.reminderTime,
   })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
         createdAt = createdAt ?? DateTime.now(),
         completedDates = completedDates ?? [],
@@ -1447,6 +1557,8 @@ class Habit {
             completedDates.map((d) => d.toIso8601String()).toList(),
         'iconCodePoint': icon.codePoint,
         'selectedDays': selectedDays,
+        'reminderHour': reminderTime?.hour,
+        'reminderMinute': reminderTime?.minute,
       };
 
   factory Habit.fromMap(Map<String, dynamic> m) {
@@ -1487,6 +1599,9 @@ class Habit {
       selectedDays: map['selectedDays'] != null
           ? List<int>.from(map['selectedDays'])
           : [1, 2, 3, 4, 5, 6, 7],
+      reminderTime: map['reminderHour'] != null && map['reminderMinute'] != null
+          ? TimeOfDay(hour: map['reminderHour'], minute: map['reminderMinute'])
+          : null,
     );
   }
 
@@ -1510,10 +1625,11 @@ class TaskItem {
   bool favorite;
   TaskCategory category;
   String? customCategoryId;
-  String? priority;
+  TaskPriority? priority;
   String? notes;
   String? imageUrl;
   DateTime createdAt;
+  DateTime? completedAt;
   DateTime? reminderAt;
   DateTime? archivedAt;
   DateTime? dueDate;
@@ -1529,6 +1645,7 @@ class TaskItem {
     this.notes,
     this.imageUrl,
     DateTime? createdAt,
+    this.completedAt,
     this.reminderAt,
     this.archivedAt,
     this.dueDate,
@@ -1542,10 +1659,11 @@ class TaskItem {
         'favorite': favorite,
         'category': category.name,
         'customCategoryId': customCategoryId,
-        'priority': priority,
+        'priority': priority?.name,
         'notes': notes,
         'imageUrl': imageUrl,
         'createdAt': createdAt.toIso8601String(),
+        'completedAt': completedAt?.toIso8601String(),
         'reminderAt': reminderAt?.toIso8601String(),
         'archivedAt': archivedAt?.toIso8601String(),
         'dueDate': dueDate?.toIso8601String(),
@@ -1560,6 +1678,15 @@ class TaskItem {
       );
     }
 
+    TaskPriority? parsePriority(String? v) {
+      if (v == null) return null;
+      try {
+        return TaskPriority.values.firstWhere((p) => p.name == v);
+      } catch (_) {
+        return null;
+      }
+    }
+
     DateTime? parseDate(dynamic v) {
       if (v == null) return null;
       return DateTime.tryParse(v.toString());
@@ -1572,10 +1699,11 @@ class TaskItem {
       favorite: map['favorite'] == true,
       category: parseCat(map['category']?.toString()),
       customCategoryId: map['customCategoryId']?.toString(),
-      priority: map['priority']?.toString(),
+      priority: parsePriority(map['priority']?.toString()),
       notes: map['notes']?.toString(),
       imageUrl: map['imageUrl']?.toString(),
       createdAt: parseDate(map['createdAt']) ?? DateTime.now(),
+      completedAt: parseDate(map['completedAt']),
       reminderAt: parseDate(map['reminderAt']),
       archivedAt: parseDate(map['archivedAt']),
       dueDate: parseDate(map['dueDate']),
@@ -1680,8 +1808,8 @@ class _TaskManagerAppState extends State<TaskManagerApp> {
       title: 'TaskFlow',
       scaffoldMessengerKey: scaffoldMessengerKey,
       themeMode: _themeMode,
-      themeAnimationDuration: const Duration(milliseconds: 600),
-      themeAnimationCurve: Curves.easeInOutCubic,
+      themeAnimationDuration: const Duration(milliseconds: 350),
+      themeAnimationCurve: Curves.easeInOut,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
             seedColor: const Color(0xFF0E9F6E), brightness: Brightness.light),
@@ -1878,20 +2006,20 @@ class _TaskManagerAppState extends State<TaskManagerApp> {
       supportedLocales: const [
         Locale('pl'),
         Locale('uk'),
-        Locale('ru'),
         Locale('en'),
         Locale('de'),
         Locale('es'),
       ],
       locale: _locale,
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
+      home: StreamBuilder<AuthState>(
+        stream: Supabase.instance.client.auth.onAuthStateChange,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             );
           }
+          final user = snapshot.data?.session?.user;
           // Перевіряємо чи користувач вже пропустив авторизацію
           return FutureBuilder<bool>(
             future: _checkSkippedAuth(),
@@ -1902,7 +2030,7 @@ class _TaskManagerAppState extends State<TaskManagerApp> {
                 );
               }
               final skipped = skipSnapshot.data ?? false;
-              if (snapshot.hasData || skipped) {
+              if (user != null || skipped) {
                 return TaskListPage(
                   onThemeChanged: _setTheme,
                   onLanguageChanged: _setLanguage,
@@ -1954,24 +2082,25 @@ class TaskListPage extends StatefulWidget {
 class _TaskListPageState extends State<TaskListPage>
     with SingleTickerProviderStateMixin {
   final TextEditingController _nameCtrl = TextEditingController();
-  final TextEditingController _priorityCtrl = TextEditingController();
   final TextEditingController _notesCtrl = TextEditingController();
   final TextEditingController _imageCtrl = TextEditingController();
   String? _selectedImageBase64;
-  TaskCategory _selectedCategory = TaskCategory.other;
-  String? _selectedCustomCategoryId;
   DateTime? _selectedReminder;
   DateTime? _selectedDueDate;
   bool _favorite = false;
+  TaskPriority? _selectedPriority;
 
   final List<TaskItem> _items = [];
   final List<TaskItem> _archived = [];
   final List<Habit> _habits = [];
   List<CustomCategory> _customCategories = [];
   String _search = '';
-  late TabController _tabController;
+  int _currentTabIndex = 0;
   String? _profileAvatarBase64;
+  String _userName = '';
+  bool _notificationsEnabled = true;
   bool _isDrawerOpen = false;
+  bool _showCompletedTasks = true;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   // Calendar state
@@ -1984,21 +2113,14 @@ class _TaskListPageState extends State<TaskListPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    _tabController.addListener(() {
-      // Оновлюємо UI коли змінюється вкладка
-      setState(() {});
-    });
     _loadData();
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _priorityCtrl.dispose();
     _notesCtrl.dispose();
     _imageCtrl.dispose();
-    _tabController.dispose();
     _saveDebounce?.cancel();
     super.dispose();
   }
@@ -2033,6 +2155,55 @@ class _TaskListPageState extends State<TaskListPage>
       },
       transitionDuration: const Duration(milliseconds: 400),
     );
+  }
+
+  Color _getPriorityColor(TaskPriority? priority) {
+    switch (priority) {
+      case TaskPriority.low:
+        return Colors.blue;
+      case TaskPriority.medium:
+        return Colors.orange;
+      case TaskPriority.high:
+        return Colors.red;
+      case null:
+        return Colors.grey;
+    }
+  }
+
+  int _calculateStreak(Habit habit) {
+    if (habit.completedDates.isEmpty) return 0;
+
+    final sortedDates = habit.completedDates
+        .map((d) => DateTime(d.year, d.month, d.day))
+        .toSet()
+        .toList()
+      ..sort((a, b) => b.compareTo(a)); // Сортуємо від найновішої
+
+    final today = DateTime.now();
+    final todayNormalized = DateTime(today.year, today.month, today.day);
+
+    int streak = 0;
+    DateTime checkDate = todayNormalized;
+
+    for (int i = 0; i < sortedDates.length; i++) {
+      if (sortedDates[i] == checkDate) {
+        streak++;
+        checkDate = checkDate.subtract(const Duration(days: 1));
+      } else if (sortedDates[i] ==
+              checkDate.subtract(const Duration(days: 1)) &&
+          i == 0) {
+        // Якщо сьогодні ще не виконано, перевіряємо від вчора
+        checkDate = checkDate.subtract(const Duration(days: 1));
+        if (sortedDates[i] == checkDate) {
+          streak++;
+          checkDate = checkDate.subtract(const Duration(days: 1));
+        }
+      } else if (sortedDates[i].isBefore(checkDate)) {
+        break; // Розрив серії
+      }
+    }
+
+    return streak;
   }
 
   Future<void> _loadData() async {
@@ -2135,6 +2306,35 @@ class _TaskListPageState extends State<TaskListPage>
           _profileAvatarBase64 = avatarData;
         });
       }
+
+      // Завантажуємо ім'я користувача
+      final userName = cloudData?['user_name'] as String? ??
+          prefs.getString('user_name') ??
+          '';
+      if (mounted) {
+        setState(() {
+          _userName = userName;
+        });
+      }
+
+      // Завантажуємо налаштування показу виконаних завдань
+      final showCompleted = prefs.getBool('show_completed') ?? true;
+      if (mounted) {
+        setState(() {
+          _showCompletedTasks = showCompleted;
+        });
+      }
+
+      // Завантажуємо налаштування повідомлень
+      final notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+      if (mounted) {
+        setState(() {
+          _notificationsEnabled = notificationsEnabled;
+        });
+      }
+
+      // Плануємо нагадування для звичок
+      _scheduleAllHabitReminders();
     } catch (e) {
       // ignore
     }
@@ -2157,6 +2357,9 @@ class _TaskListPageState extends State<TaskListPage>
       await prefs.setString('profile_avatar', _profileAvatarBase64!);
     }
 
+    // Зберігаємо ім'я користувача
+    await prefs.setString('user_name', _userName);
+
     // Синхронізація з хмарою якщо користувач увійшов
     final authService = AuthService();
     if (authService.currentUser != null) {
@@ -2167,10 +2370,63 @@ class _TaskListPageState extends State<TaskListPage>
           'habits': habitsRaw,
           'custom_categories': categoriesRaw,
           'profile_avatar': _profileAvatarBase64,
+          'user_name': _userName,
           'last_sync': DateTime.now().toIso8601String(),
         });
       } catch (e) {
         // Ігноруємо помилки синхронізації
+      }
+    }
+  }
+
+  void _scheduleHabitReminders(Habit habit) {
+    if (habit.reminderTime == null || !habit.active) return;
+
+    final now = DateTime.now();
+
+    // Плануємо нагадування на наступні 7 днів
+    for (int i = 0; i < 7; i++) {
+      final date = now.add(Duration(days: i));
+      final weekday = date.weekday;
+
+      if (habit.selectedDays.contains(weekday)) {
+        final scheduledDate = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          habit.reminderTime!.hour,
+          habit.reminderTime!.minute,
+        );
+
+        // Пропускаємо якщо час вже минув
+        if (scheduledDate.isAfter(now) && _notificationsEnabled) {
+          final notificationId = habit.id.hashCode + i;
+          scheduleNotification(
+            id: notificationId,
+            title: 'Нагадування про звичку',
+            body: habit.name,
+            scheduledDate: scheduledDate,
+          );
+
+          // Додатковий лог для перевірки
+          print('Scheduled habit reminder: ${habit.name} at $scheduledDate');
+        }
+      }
+    }
+  }
+
+  void _cancelHabitReminders(Habit habit) {
+    // Скасовуємо нагадування на 7 днів
+    for (int i = 0; i < 7; i++) {
+      final notificationId = habit.id.hashCode + i;
+      cancelNotification(notificationId);
+    }
+  }
+
+  void _scheduleAllHabitReminders() {
+    for (final habit in _habits) {
+      if (habit.reminderTime != null && habit.active) {
+        _scheduleHabitReminders(habit);
       }
     }
   }
@@ -2222,40 +2478,50 @@ class _TaskListPageState extends State<TaskListPage>
 
   void _resetDialogFields() {
     _nameCtrl.clear();
-    _priorityCtrl.clear();
     _notesCtrl.clear();
     _imageCtrl.clear();
     _selectedImageBase64 = null;
-    _selectedCategory = TaskCategory.other;
-    _selectedCustomCategoryId = null;
     _selectedReminder = null;
     _selectedDueDate = null;
     _favorite = false;
+    _selectedPriority = null;
   }
 
   void _addItem() {
+    final loc = AppLocalizations.of(context);
     final t = _nameCtrl.text.trim();
-    if (t.isEmpty) return;
+    final taskName =
+        t.isEmpty ? (loc.translate('default_task_name') ?? 'Task') : t;
+
+    final newTask = TaskItem(
+      name: taskName,
+      favorite: _favorite,
+      category: TaskCategory.other,
+      customCategoryId: null,
+      priority: _selectedPriority,
+      notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+      imageUrl: _selectedImageBase64 ??
+          (_imageCtrl.text.trim().isEmpty ? null : _imageCtrl.text.trim()),
+      reminderAt: _selectedReminder,
+      dueDate: _selectedDueDate,
+    );
 
     setState(() {
-      _items.insert(
-        0,
-        TaskItem(
-          name: t,
-          favorite: _favorite,
-          category: _selectedCategory,
-          customCategoryId: _selectedCustomCategoryId,
-          priority: _priorityCtrl.text.trim().isEmpty
-              ? null
-              : _priorityCtrl.text.trim(),
-          notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-          imageUrl: _selectedImageBase64 ??
-              (_imageCtrl.text.trim().isEmpty ? null : _imageCtrl.text.trim()),
-          reminderAt: _selectedReminder,
-          dueDate: _selectedDueDate,
-        ),
-      );
+      _items.insert(0, newTask);
     });
+
+    // Планування сповіщення
+    if (_notificationsEnabled &&
+        _selectedReminder != null &&
+        _selectedReminder!.isAfter(DateTime.now())) {
+      scheduleNotification(
+        id: newTask.id.hashCode,
+        title: 'Нагадування: $taskName',
+        body: newTask.notes ?? 'Час виконати завдання!',
+        scheduledDate: _selectedReminder!,
+      );
+    }
+
     _resetDialogFields();
     _saveData();
   }
@@ -2263,6 +2529,11 @@ class _TaskListPageState extends State<TaskListPage>
   void _toggleCompleted(TaskItem it) {
     setState(() {
       it.completed = !it.completed;
+      if (it.completed) {
+        it.completedAt = DateTime.now();
+      } else {
+        it.completedAt = null;
+      }
     });
     _scheduleSave();
   }
@@ -2313,47 +2584,358 @@ class _TaskListPageState extends State<TaskListPage>
     _saveData();
   }
 
-  Future<void> _pickReminder() async {
-    final now = DateTime.now();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final date = await showDatePicker(
+  void _openEditTaskDialog(TaskItem task) {
+    final loc = AppLocalizations.of(context);
+    final nameCtrl = TextEditingController(text: task.name);
+    final notesCtrl = TextEditingController(text: task.notes ?? '');
+    bool favorite = task.favorite;
+    TaskPriority? priority = task.priority;
+    DateTime? dueDate = task.dueDate;
+    DateTime? reminder = task.reminderAt;
+
+    showGeneralDialog<void>(
       context: context,
-      locale: Localizations.localeOf(context),
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
-      initialDate: _selectedReminder ?? now,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: isDark
-                ? const ColorScheme.dark(
-                    primary: Color(0xFF0E9F6E),
-                    onPrimary: Colors.white,
-                    surface: Color(0xFF1F2937),
-                    onSurface: Colors.white,
-                  )
-                : const ColorScheme.light(
-                    primary: Color(0xFF0E9F6E),
-                    onPrimary: Colors.white,
-                    surface: Colors.white,
-                    onSurface: Colors.black87,
+      barrierDismissible: true,
+      barrierLabel: 'Edit Task Dialog',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 400),
+      pageBuilder: (context, animation, secondaryAnimation) => Container(),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curvedAnimation = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+          reverseCurve: Curves.easeInBack,
+        );
+
+        return ScaleTransition(
+          scale: Tween<double>(begin: 0.8, end: 1.0).animate(curvedAnimation),
+          child: FadeTransition(
+            opacity: Tween<double>(begin: 0.0, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            ),
+            child: StatefulBuilder(
+              builder: (ctx, setDialogState) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                title: Row(
+                  children: [
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      duration: const Duration(milliseconds: 600),
+                      curve: Curves.elasticOut,
+                      builder: (context, value, child) {
+                        return Transform.scale(
+                          scale: value,
+                          child: child,
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.edit, color: Colors.blue),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      loc.edit,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Назва завдання зі зірочкою
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: nameCtrl,
+                              autofocus: true,
+                              decoration: InputDecoration(
+                                hintText: loc.taskName,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                filled: true,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () {
+                              setDialogState(() {
+                                favorite = !favorite;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(50),
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween(
+                                    begin: 0.0, end: favorite ? 1.0 : 0.0),
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.elasticOut,
+                                builder: (context, value, child) {
+                                  return Transform.scale(
+                                    scale: 1.0 + (value * 0.2),
+                                    child: Icon(
+                                      favorite ? Icons.star : Icons.star_border,
+                                      color: Color.lerp(Colors.grey.shade400,
+                                          Colors.amber, value),
+                                      size: 36,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Пріоритет
+                      DropdownButtonFormField<TaskPriority?>(
+                        value: priority,
+                        decoration: InputDecoration(
+                          labelText: loc.priority,
+                          prefixIcon: const Icon(Icons.flag),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        items: [
+                          const DropdownMenuItem<TaskPriority?>(
+                            value: null,
+                            child: Text('—'),
+                          ),
+                          DropdownMenuItem<TaskPriority?>(
+                            value: TaskPriority.low,
+                            child: Row(
+                              children: [
+                                Icon(Icons.circle,
+                                    color: Colors.blue, size: 12),
+                                SizedBox(width: 8),
+                                Text(loc.priorityLow),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem<TaskPriority?>(
+                            value: TaskPriority.medium,
+                            child: Row(
+                              children: [
+                                Icon(Icons.circle,
+                                    color: Colors.orange, size: 12),
+                                SizedBox(width: 8),
+                                Text(loc.priorityMedium),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem<TaskPriority?>(
+                            value: TaskPriority.high,
+                            child: Row(
+                              children: [
+                                Icon(Icons.circle, color: Colors.red, size: 12),
+                                SizedBox(width: 8),
+                                Text(loc.priorityHigh),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setDialogState(() => priority = value);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Примітки
+                      TextField(
+                        controller: notesCtrl,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: loc.notes,
+                          hintText: loc.translate('additional_info') ??
+                              'Додаткова інформація...',
+                          prefixIcon: const Icon(Icons.note),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Дата виконання
+                      OutlinedButton.icon(
+                        icon: Icon(
+                          dueDate != null
+                              ? Icons.check_circle
+                              : Icons.calendar_today,
+                          color: dueDate != null ? Colors.green : null,
+                        ),
+                        label: Text(dueDate == null
+                            ? loc.selectDate
+                            : '📅 ${dueDate!.day}.${dueDate!.month}.${dueDate!.year}'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                          backgroundColor:
+                              dueDate != null ? Colors.green.shade50 : null,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: ctx,
+                            initialDate: dueDate ?? DateTime.now(),
+                            firstDate: DateTime.now()
+                                .subtract(const Duration(days: 365)),
+                            lastDate: DateTime.now()
+                                .add(const Duration(days: 365 * 5)),
+                          );
+                          if (date != null) {
+                            setDialogState(() {
+                              dueDate = date;
+                              // Оновлюємо дату нагадування якщо воно вже встановлене
+                              if (reminder != null) {
+                                reminder = DateTime(
+                                  date.year,
+                                  date.month,
+                                  date.day,
+                                  reminder!.hour,
+                                  reminder!.minute,
+                                );
+                              }
+                            });
+                          }
+                        },
+                      ),
+                      if (dueDate != null)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.clear, size: 16),
+                            label: Text(loc.remove),
+                            onPressed: () {
+                              setDialogState(() => dueDate = null);
+                            },
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+
+                      // Нагадування
+                      OutlinedButton.icon(
+                        icon: Icon(
+                          reminder != null ? Icons.check_circle : Icons.alarm,
+                          color: reminder != null ? Colors.green : null,
+                        ),
+                        label: Text(reminder == null
+                            ? loc.addReminder
+                            : '⏰ ${reminder!.hour.toString().padLeft(2, '0')}:${reminder!.minute.toString().padLeft(2, '0')}'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                          backgroundColor:
+                              reminder != null ? Colors.blue.shade50 : null,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () async {
+                          // Використовуємо вибрану дату або сьогодні
+                          final date = dueDate ?? DateTime.now();
+                          final time = await showTimePicker(
+                            context: ctx,
+                            initialTime: TimeOfDay.fromDateTime(
+                                reminder ?? DateTime.now()),
+                          );
+                          if (time != null) {
+                            setDialogState(() {
+                              reminder = DateTime(date.year, date.month,
+                                  date.day, time.hour, time.minute);
+                            });
+                          }
+                        },
+                      ),
+                      if (reminder != null)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.clear, size: 16),
+                            label: Text(loc.remove),
+                            onPressed: () {
+                              setDialogState(() => reminder = null);
+                            },
+                          ),
+                        ),
+                    ],
                   ),
-            textTheme: TextTheme(
-              bodyLarge: TextStyle(
-                  color: isDark ? Colors.white : Colors.black87, inherit: true),
-              bodyMedium: TextStyle(
-                  color: isDark ? Colors.white : Colors.black87, inherit: true),
-              labelLarge: TextStyle(
-                  color: isDark ? Colors.white : Colors.black87, inherit: true),
-              headlineMedium:
-                  const TextStyle(color: Colors.white, inherit: true),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(loc.cancel),
+                  ),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.save),
+                    label: Text(loc.translate('save') ?? 'Зберегти'),
+                    style: FilledButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () {
+                      final t = nameCtrl.text.trim();
+                      if (t.isEmpty) return;
+                      setState(() {
+                        task.name = t;
+                        task.favorite = favorite;
+                        task.priority = priority;
+                        task.notes = notesCtrl.text.trim().isEmpty
+                            ? null
+                            : notesCtrl.text.trim();
+                        task.dueDate = dueDate;
+                        task.reminderAt = reminder;
+                      });
+
+                      // Скасувати старе сповіщення та запланувати нове
+                      cancelNotification(task.id.hashCode);
+                      if (_notificationsEnabled &&
+                          reminder != null &&
+                          reminder!.isAfter(DateTime.now())) {
+                        scheduleNotification(
+                          id: task.id.hashCode,
+                          title: 'Нагадування: ${task.name}',
+                          body: task.notes ?? 'Час виконати завдання!',
+                          scheduledDate: reminder!,
+                        );
+                      }
+
+                      _saveData();
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
-          child: child!,
         );
       },
     );
-    if (date == null) return;
+  }
+
+  Future<void> _pickReminder() async {
+    final now = DateTime.now();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Використовуємо вибрану дату завдання або сьогодні
+    final date = _selectedDueDate ?? DateTime.now();
+
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_selectedReminder ?? now),
@@ -2409,7 +2991,8 @@ class _TaskListPageState extends State<TaskListPage>
     final q = _search.trim().toLowerCase();
     final list = _items.where((it) {
       final matchesQuery = q.isEmpty || it.name.toLowerCase().contains(q);
-      return matchesQuery;
+      final showByCompleted = _showCompletedTasks || !it.completed;
+      return matchesQuery && showByCompleted;
     }).toList();
 
     list.sort((a, b) {
@@ -2613,6 +3196,7 @@ class _TaskListPageState extends State<TaskListPage>
                       child: TextField(
                         controller: _nameCtrl,
                         autofocus: true,
+                        onChanged: (_) => setDialogState(() {}),
                         decoration: InputDecoration(
                           hintText: loc.taskName,
                           border: const OutlineInputBorder(),
@@ -2652,120 +3236,54 @@ class _TaskListPageState extends State<TaskListPage>
                 ),
                 const SizedBox(height: 16),
 
-                // Категорія з іконкою
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(loc.category,
-                        style: Theme.of(context).textTheme.titleSmall),
-                    TextButton.icon(
-                      icon: const Icon(Icons.settings, size: 16),
-                      label: Text(loc.manageCategories),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                      onPressed: () async {
-                        Navigator.pop(ctx);
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => CategoriesManagementPage(
-                              categories: _customCategories,
-                              onSave: (newCategories) {
-                                setState(() {
-                                  _customCategories = newCategories;
-                                });
-                                _saveData();
-                              },
-                            ),
-                          ),
-                        );
-                        _openAddDialog();
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // Standard categories
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: DropdownButtonFormField<TaskCategory>(
-                    value: _selectedCategory,
-                    decoration: InputDecoration(
-                      border: InputBorder.none,
-                      prefixIcon: const Icon(Icons.category),
-                      labelText: 'Стандартна',
-                    ),
-                    items: TaskCategory.values
-                        .map((c) => DropdownMenuItem(
-                            value: c, child: Text(categoryLabel(c, context))))
-                        .toList(),
-                    onChanged: (c) {
-                      setDialogState(() {
-                        _selectedCategory = c ?? TaskCategory.other;
-                        _selectedCustomCategoryId = null;
-                      });
-                      setState(() {
-                        _selectedCategory = c ?? TaskCategory.other;
-                        _selectedCustomCategoryId = null;
-                      });
-                    },
-                  ),
-                ),
-                if (_customCategories.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: DropdownButtonFormField<String?>(
-                      value: _selectedCustomCategoryId,
-                      decoration: InputDecoration(
-                        border: InputBorder.none,
-                        prefixIcon: const Icon(Icons.label),
-                        labelText: 'Власна категорія',
-                      ),
-                      items: [
-                        DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('Не вибрано',
-                              style: TextStyle(color: Colors.grey.shade600)),
-                        ),
-                        ..._customCategories.map((c) => DropdownMenuItem(
-                              value: c.id,
-                              child: Row(
-                                children: [
-                                  Icon(c.icon, color: c.color, size: 20),
-                                  const SizedBox(width: 8),
-                                  Text(c.name),
-                                ],
-                              ),
-                            )),
-                      ],
-                      onChanged: (id) {
-                        setDialogState(() => _selectedCustomCategoryId = id);
-                        setState(() => _selectedCustomCategoryId = id);
-                      },
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-
                 // Пріоритет
-                TextField(
-                  controller: _priorityCtrl,
+                DropdownButtonFormField<TaskPriority?>(
+                  value: _selectedPriority,
                   decoration: InputDecoration(
                     labelText: loc.priority,
-                    hintText: 'Високий, Середній, Низький',
                     prefixIcon: const Icon(Icons.flag),
                     border: const OutlineInputBorder(),
                   ),
+                  items: [
+                    DropdownMenuItem<TaskPriority?>(
+                      value: null,
+                      child: Text(loc.notSelected),
+                    ),
+                    DropdownMenuItem<TaskPriority?>(
+                      value: TaskPriority.low,
+                      child: Row(
+                        children: [
+                          Icon(Icons.circle, color: Colors.blue, size: 12),
+                          SizedBox(width: 8),
+                          Text('Низький'),
+                        ],
+                      ),
+                    ),
+                    DropdownMenuItem<TaskPriority?>(
+                      value: TaskPriority.medium,
+                      child: Row(
+                        children: [
+                          Icon(Icons.circle, color: Colors.orange, size: 12),
+                          SizedBox(width: 8),
+                          Text('Середній'),
+                        ],
+                      ),
+                    ),
+                    DropdownMenuItem<TaskPriority?>(
+                      value: TaskPriority.high,
+                      child: Row(
+                        children: [
+                          Icon(Icons.circle, color: Colors.red, size: 12),
+                          SizedBox(width: 8),
+                          Text('Високий'),
+                        ],
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setDialogState(() => _selectedPriority = value);
+                    setState(() => _selectedPriority = value);
+                  },
                 ),
                 const SizedBox(height: 16),
 
@@ -2783,10 +3301,7 @@ class _TaskListPageState extends State<TaskListPage>
                 ),
                 const SizedBox(height: 16),
 
-                const Divider(),
-                const SizedBox(height: 8),
-
-                // Дедлайн
+                // Дата виконання
                 OutlinedButton.icon(
                   icon: Icon(
                     _selectedDueDate != null
@@ -2795,8 +3310,8 @@ class _TaskListPageState extends State<TaskListPage>
                     color: _selectedDueDate != null ? Colors.green : null,
                   ),
                   label: Text(_selectedDueDate == null
-                      ? 'Вибрати дедлайн'
-                      : '📅 До: ${_selectedDueDate!.day}.${_selectedDueDate!.month}.${_selectedDueDate!.year}'),
+                      ? loc.selectDate
+                      : '📅 ${_selectedDueDate!.day}.${_selectedDueDate!.month}.${_selectedDueDate!.year}'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 48),
                     backgroundColor:
@@ -2806,12 +3321,25 @@ class _TaskListPageState extends State<TaskListPage>
                     final date = await showDatePicker(
                       context: context,
                       initialDate: _selectedDueDate ?? DateTime.now(),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                      firstDate:
+                          DateTime.now().subtract(const Duration(days: 365)),
+                      lastDate:
+                          DateTime.now().add(const Duration(days: 365 * 5)),
                     );
                     if (date != null) {
-                      setDialogState(() => _selectedDueDate = date);
-                      setState(() => _selectedDueDate = date);
+                      setDialogState(() {
+                        _selectedDueDate = date;
+                        // Оновлюємо дату нагадування якщо воно вже встановлене
+                        if (_selectedReminder != null) {
+                          _selectedReminder = DateTime(
+                            date.year,
+                            date.month,
+                            date.day,
+                            _selectedReminder!.hour,
+                            _selectedReminder!.minute,
+                          );
+                        }
+                      });
                     }
                   },
                 ),
@@ -2820,7 +3348,7 @@ class _TaskListPageState extends State<TaskListPage>
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
                       icon: const Icon(Icons.clear, size: 16),
-                      label: const Text('Прибрати'),
+                      label: Text(loc.remove),
                       onPressed: () {
                         setDialogState(() => _selectedDueDate = null);
                         setState(() => _selectedDueDate = null);
@@ -2838,71 +3366,18 @@ class _TaskListPageState extends State<TaskListPage>
                     color: _selectedReminder != null ? Colors.green : null,
                   ),
                   label: Text(_selectedReminder == null
-                      ? 'Додати нагадування'
+                      ? loc.addReminder
                       : '⏰ ${_selectedReminder!.day}.${_selectedReminder!.month} о ${_selectedReminder!.hour.toString().padLeft(2, '0')}:${_selectedReminder!.minute.toString().padLeft(2, '0')}'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 48),
                     backgroundColor:
                         _selectedReminder != null ? Colors.blue.shade50 : null,
                   ),
-                  onPressed: _pickReminder,
+                  onPressed: () async {
+                    await _pickReminder();
+                    setDialogState(() {});
+                  },
                 ),
-                const SizedBox(height: 8),
-
-                // Фото
-                OutlinedButton.icon(
-                  icon: Icon(
-                    _selectedImageBase64 != null
-                        ? Icons.check_circle
-                        : Icons.photo_library,
-                    color: _selectedImageBase64 != null ? Colors.green : null,
-                  ),
-                  label: Text(
-                    _selectedImageBase64 != null
-                        ? '✓ Фото додано'
-                        : 'Додати фото',
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 48),
-                    backgroundColor: _selectedImageBase64 != null
-                        ? Colors.purple.shade50
-                        : null,
-                  ),
-                  onPressed: _pickImage,
-                ),
-
-                if (_selectedImageBase64 != null) ...[
-                  const SizedBox(height: 8),
-                  Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.memory(
-                          base64Decode(_selectedImageBase64!),
-                          height: 120,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: IconButton(
-                          icon: const Icon(Icons.close),
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.black54,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.all(4),
-                          ),
-                          onPressed: () {
-                            setDialogState(() => _selectedImageBase64 = null);
-                            setState(() => _selectedImageBase64 = null);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ],
             ),
           ),
@@ -2912,10 +3387,12 @@ class _TaskListPageState extends State<TaskListPage>
                 child: Text(loc.cancel)),
             ElevatedButton.icon(
               icon: const Icon(Icons.add),
-              onPressed: () {
-                _addItem();
-                Navigator.of(ctx).pop();
-              },
+              onPressed: _nameCtrl.text.trim().isEmpty
+                  ? null
+                  : () {
+                      _addItem();
+                      Navigator.of(ctx).pop();
+                    },
               label: Text(loc.add),
             ),
           ],
@@ -2931,15 +3408,7 @@ class _TaskListPageState extends State<TaskListPage>
       key: _scaffoldKey,
       appBar: AppBar(
         title: Text(loc.appTitle),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: [
-            Tab(icon: const Icon(Icons.task_alt), text: loc.tasks),
-            Tab(icon: const Icon(Icons.calendar_today), text: loc.calendar),
-            Tab(icon: const Icon(Icons.favorite), text: loc.habits),
-            Tab(icon: const Icon(Icons.timer), text: loc.pomodoro),
-          ],
-        ),
+        elevation: 0,
       ),
       drawerScrimColor: Colors.transparent,
       onDrawerChanged: (isOpened) {
@@ -3008,63 +3477,15 @@ class _TaskListPageState extends State<TaskListPage>
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    loc.profile,
+                    _userName.isNotEmpty ? _userName : loc.profile,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Text(
-                    '${_items.length} ${loc.tasks.toLowerCase()}',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
                 ],
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.inbox),
-              title: Text(loc.inbox),
-              subtitle: Text(loc.inboxDesc),
-              trailing: Text(
-                '${_items.where((item) => !item.completed).length}',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  _createRoute(
-                    InboxPage(
-                      items: _items,
-                      onToggle: (item) {
-                        setState(() {
-                          item.completed = !item.completed;
-                        });
-                        _saveData();
-                      },
-                      onDelete: (item) {
-                        setState(() {
-                          _items.remove(item);
-                          _archived.add(item);
-                        });
-                        _saveData();
-                      },
-                      onEdit: (item) {
-                        final loc = AppLocalizations.of(context);
-                        _showTaskDialog(loc);
-                      },
-                    ),
-                  ),
-                );
-              },
             ),
             ListTile(
               leading: const Icon(Icons.today),
@@ -3088,6 +3509,11 @@ class _TaskListPageState extends State<TaskListPage>
                       onToggle: (item) {
                         setState(() {
                           item.completed = !item.completed;
+                          if (item.completed) {
+                            item.completedAt = DateTime.now();
+                          } else {
+                            item.completedAt = null;
+                          }
                         });
                         _saveData();
                       },
@@ -3118,6 +3544,19 @@ class _TaskListPageState extends State<TaskListPage>
                   _createRoute(
                     ProfilePage(
                       avatarBase64: _profileAvatarBase64,
+                      userName: _userName,
+                      onUserNameChanged: (name) {
+                        setState(() {
+                          _userName = name;
+                        });
+                        _saveData();
+                      },
+                      onAvatarChanged: (avatar) {
+                        setState(() {
+                          _profileAvatarBase64 = avatar;
+                        });
+                        _saveData();
+                      },
                     ),
                   ),
                 );
@@ -3133,6 +3572,36 @@ class _TaskListPageState extends State<TaskListPage>
                 final totalCount = _items.length + _archived.length;
                 final activeHabitsCount = _habits.length;
 
+                // Перевірка досягнень
+                final hasNightTask = _items.any((item) {
+                  if (item.createdAt == null) return false;
+                  final hour = item.createdAt!.hour;
+                  return hour >= 22 || hour < 6;
+                });
+
+                final hasEarlyTask = _items.any((item) {
+                  if (!item.completed || item.completedAt == null) return false;
+                  final hour = item.completedAt!.hour;
+                  return hour < 8;
+                });
+
+                final hasSameDayTask = _items.any((item) {
+                  if (!item.completed ||
+                      item.createdAt == null ||
+                      item.completedAt == null) return false;
+                  final created = item.createdAt!;
+                  final completed = item.completedAt!;
+                  return created.year == completed.year &&
+                      created.month == completed.month &&
+                      created.day == completed.day;
+                });
+
+                int maxStreak = 0;
+                for (final habit in _habits) {
+                  int streak = _calculateStreak(habit);
+                  if (streak > maxStreak) maxStreak = streak;
+                }
+
                 Navigator.push(
                   context,
                   _createRoute(
@@ -3140,6 +3609,10 @@ class _TaskListPageState extends State<TaskListPage>
                       totalTasks: totalCount,
                       completedTasks: completedCount,
                       habitsCount: activeHabitsCount,
+                      hasNightTask: hasNightTask,
+                      hasEarlyTask: hasEarlyTask,
+                      hasSameDayTask: hasSameDayTask,
+                      maxHabitStreak: maxStreak,
                     ),
                   ),
                 );
@@ -3150,6 +3623,23 @@ class _TaskListPageState extends State<TaskListPage>
               title: Text(loc.statistics),
               onTap: () {
                 Navigator.pop(context);
+
+                // Підрахунок активності за останні 7 днів
+                final weeklyActivity = <int>[];
+                final now = DateTime.now();
+                for (int i = 6; i >= 0; i--) {
+                  final day = DateTime(now.year, now.month, now.day)
+                      .subtract(Duration(days: i));
+                  final count = _items.where((task) {
+                    if (task.completedAt == null) return false;
+                    final completed = task.completedAt!;
+                    return completed.year == day.year &&
+                        completed.month == day.month &&
+                        completed.day == day.day;
+                  }).length;
+                  weeklyActivity.add(count);
+                }
+
                 Navigator.push(
                   context,
                   _createRoute(
@@ -3157,42 +3647,13 @@ class _TaskListPageState extends State<TaskListPage>
                       totalTasks: _items.length,
                       completedTasks: _items.where((t) => t.completed).length,
                       habitsCount: _habits.length,
-                      activeHabitsStreak: _habits
-                          .where((h) => h.completedDates.contains(
-                              DateTime.now().toIso8601String().split('T')[0]))
-                          .length,
-                    ),
-                  ),
-                );
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.category),
-              title: Text(loc.categories),
-              subtitle: Text(
-                  '${_customCategories.length} ${loc.category.toLowerCase()}'),
-              trailing: IconButton(
-                icon: const Icon(Icons.add_circle_outline),
-                tooltip: loc.addCategory,
-                onPressed: () {
-                  Navigator.pop(context);
-                  _showAddCategoryDialog();
-                },
-              ),
-              onTap: () async {
-                Navigator.pop(context);
-                await Navigator.push(
-                  context,
-                  _createRoute(
-                    CategoriesManagementPage(
-                      categories: _customCategories,
-                      onSave: (newCategories) {
-                        setState(() {
-                          _customCategories = newCategories;
-                        });
-                        _saveData();
-                      },
+                      activeHabitsStreak: _habits.isEmpty
+                          ? 0
+                          : _habits
+                              .map((h) => _calculateStreak(h))
+                              .reduce((a, b) => a > b ? a : b),
+                      weeklyActivity: weeklyActivity,
+                      archivedTasks: _archived.length,
                     ),
                   ),
                 );
@@ -3226,40 +3687,53 @@ class _TaskListPageState extends State<TaskListPage>
                     ),
                   ),
                 );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: Text(loc.about),
-              onTap: () {
-                Navigator.pop(context);
-                showAboutDialog(
-                  context: context,
-                  applicationName: 'TaskFlow',
-                  applicationVersion: '2.1.0',
-                  applicationIcon: const Icon(Icons.task_alt, size: 48),
-                );
+                // Оновлюємо налаштування після повернення
+                final prefs = await SharedPreferences.getInstance();
+                final showCompleted = prefs.getBool('show_completed') ?? true;
+                if (mounted) {
+                  setState(() {
+                    _showCompletedTasks = showCompleted;
+                  });
+                }
               },
             ),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildTasksTab(),
-          _buildCalendarTab(),
-          _buildHabitsTab(),
-          PomodoroPage(),
+      body: [
+        _buildTasksTab(),
+        _buildCalendarTab(),
+        _buildHabitsTab(),
+      ][_currentTabIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentTabIndex,
+        onTap: (index) {
+          setState(() {
+            _currentTabIndex = index;
+          });
+        },
+        items: [
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.task_alt),
+            label: loc.tasks,
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.calendar_today),
+            label: loc.calendar,
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.favorite),
+            label: loc.habits,
+          ),
         ],
       ),
-      floatingActionButton: _tabController.index == 0
+      floatingActionButton: _currentTabIndex == 0
           ? FloatingActionButton(
               onPressed: _openAddDialog,
               child: const Icon(Icons.add),
               tooltip: loc.addTask,
             )
-          : _tabController.index == 2
+          : _currentTabIndex == 2
               ? FloatingActionButton(
                   onPressed: _openAddHabitDialog,
                   child: const Icon(Icons.add),
@@ -3292,30 +3766,13 @@ class _TaskListPageState extends State<TaskListPage>
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: _StatsCard(
-                  total: total, fav: favCount, completed: completedCount),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: TextField(
                 decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.search), hintText: loc.search),
                 onChanged: (v) => setState(() => _search = v),
               ),
             ),
-            if (_archived.isNotEmpty)
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Row(
-                  children: [
-                    const Icon(Icons.archive, size: 18),
-                    const SizedBox(width: 6),
-                    Text('${loc.archive}: ${_archived.length}'),
-                  ],
-                ),
-              ),
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 250),
@@ -3345,12 +3802,24 @@ class _TaskListPageState extends State<TaskListPage>
                           final it = items[i];
                           final due = it.reminderAt != null &&
                                   it.reminderAt!.isAfter(DateTime.now())
-                              ? '${loc.due}: ${it.reminderAt!.hour.toString().padLeft(2, '0')}:${it.reminderAt!.minute.toString().padLeft(2, '0')}'
+                              ? '${it.reminderAt!.hour.toString().padLeft(2, '0')}:${it.reminderAt!.minute.toString().padLeft(2, '0')}'
                               : null;
                           return Dismissible(
                             key: ValueKey(it.id),
-                            direction: DismissDirection.endToStart,
+                            direction: DismissDirection.horizontal,
                             background: Container(
+                              margin: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.blue,
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              alignment: Alignment.centerLeft,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: const Icon(Icons.edit, color: Colors.white),
+                            ),
+                            secondaryBackground: Container(
                               margin: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 6),
                               decoration: BoxDecoration(
@@ -3361,8 +3830,15 @@ class _TaskListPageState extends State<TaskListPage>
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 20),
                               child: const Icon(Icons.delete_forever,
-                                  color: Colors.white),
+                                      color: Colors.white),
                             ),
+                            confirmDismiss: (direction) async {
+                              if (direction == DismissDirection.startToEnd) {
+                                _openEditTaskDialog(it);
+                                return false;
+                              }
+                              return true;
+                            },
                             onDismissed: (_) => _removeItem(it),
                             child: Card(
                               margin: const EdgeInsets.symmetric(
@@ -3378,52 +3854,89 @@ class _TaskListPageState extends State<TaskListPage>
                                           color: Colors.grey)
                                       : null,
                                 ),
-                                subtitle: Wrap(
-                                  spacing: 8,
-                                  runSpacing: 4,
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    if (it.priority != null)
-                                      Chip(
-                                          label: Text(
-                                              '${loc.priority}: ${it.priority!}')),
-                                    Chip(
-                                        label: Text(categoryLabel(
-                                            it.category, context))),
-                                    if (it.dueDate != null)
-                                      Chip(
-                                          avatar: Icon(Icons.calendar_today,
-                                              size: 16,
-                                              color: it.dueDate!.isBefore(
-                                                          DateTime.now()) &&
-                                                      !it.completed
-                                                  ? Colors.red
-                                                  : null),
-                                          label: Text(
-                                              'До: ${it.dueDate!.day}.${it.dueDate!.month}.${it.dueDate!.year}',
-                                              style: TextStyle(
-                                                color: it.dueDate!.isBefore(
-                                                            DateTime.now()) &&
-                                                        !it.completed
-                                                    ? Colors.red
-                                                    : null,
-                                                fontWeight: it.dueDate!
-                                                            .isBefore(DateTime
-                                                                .now()) &&
-                                                        !it.completed
-                                                    ? FontWeight.bold
-                                                    : null,
-                                              ))),
-                                    if (due != null)
-                                      Chip(
-                                          avatar:
-                                              const Icon(Icons.alarm, size: 16),
-                                          label: Text(due)),
                                     if (it.notes != null &&
                                         it.notes!.isNotEmpty)
-                                      Chip(
-                                          avatar:
-                                              const Icon(Icons.note, size: 16),
-                                          label: Text(loc.note)),
+                                      Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 4),
+                                        child: Text(
+                                          it.notes!,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withOpacity(0.7),
+                                          ),
+                                        ),
+                                      ),
+                                    Wrap(
+                                      spacing: 4,
+                                      runSpacing: 2,
+                                      children: [
+                                        if (it.priority != null)
+                                          Chip(
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              avatar: Icon(Icons.flag,
+                                                  size: 14,
+                                                  color: _getPriorityColor(
+                                                      it.priority)),
+                                              label: Text(
+                                                  it.priority ==
+                                                          TaskPriority.low
+                                                      ? 'Низький'
+                                                      : it.priority ==
+                                                              TaskPriority
+                                                                  .medium
+                                                          ? 'Середній'
+                                                          : 'Високий',
+                                                  style: const TextStyle(
+                                                      fontSize: 11))),
+                                        if (it.dueDate != null)
+                                          Chip(
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              avatar: Icon(Icons.calendar_today,
+                                                  size: 14,
+                                                  color: it.dueDate!.isBefore(
+                                                              DateTime.now()) &&
+                                                          !it.completed
+                                                      ? Colors.red
+                                                      : null),
+                                              label: Text(
+                                                  '${it.dueDate!.day}.${it.dueDate!.month}.${it.dueDate!.year}',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: it.dueDate!.isBefore(
+                                                                DateTime
+                                                                    .now()) &&
+                                                            !it.completed
+                                                        ? Colors.red
+                                                        : null,
+                                                    fontWeight: it.dueDate!
+                                                                .isBefore(DateTime
+                                                                    .now()) &&
+                                                            !it.completed
+                                                        ? FontWeight.bold
+                                                        : null,
+                                                  ))),
+                                        if (due != null)
+                                          Chip(
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              avatar: const Icon(Icons.alarm,
+                                                  size: 14),
+                                              label: Text(due,
+                                                  style: const TextStyle(
+                                                      fontSize: 11))),
+                                      ],
+                                    ),
                                   ],
                                 ),
                                 trailing: Row(
@@ -3541,57 +4054,76 @@ class _TaskListPageState extends State<TaskListPage>
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Statistics
-                Text(loc.monthStatistics,
-                    style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 8),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                // Selected day tasks
+                if (_selectedDay != null) ...[
+                  Text(
+                    '${_selectedDay!.day} ${_monthName(_selectedDay!.month)}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Завдання
+                  if (_getTasksForDay(_selectedDay!).isNotEmpty) ...[
+                    Row(
                       children: [
-                        _buildStatColumn(
-                          context,
-                          _getTotalTasksInMonth(_calendarMonth).toString(),
-                          loc.totalTasks,
-                          null,
-                        ),
-                        _buildStatColumn(
-                          context,
-                          _getCompletedTasksInMonth(_calendarMonth).toString(),
-                          loc.completedTasks,
-                          Colors.green,
-                        ),
-                        _buildStatColumn(
-                          context,
-                          '${(_getCompletedTasksInMonth(_calendarMonth) * 100 ~/ (_getTotalTasksInMonth(_calendarMonth) == 0 ? 1 : _getTotalTasksInMonth(_calendarMonth)))}%',
-                          loc.progress,
-                          null,
+                        const Icon(Icons.task_alt, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          loc.tasks,
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Selected day tasks
-                if (_selectedDay != null) ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '${_selectedDay!.day} ${_monthName(_selectedDay!.month)}',
-                        style: Theme.of(context).textTheme.titleMedium,
+                    const SizedBox(height: 4),
+                    ..._buildSelectedDayTasks(_selectedDay!),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Звички
+                  if (_getHabitsForDay(_selectedDay!).isNotEmpty) ...[
+                    Row(
+                      children: [
+                        const Icon(Icons.repeat, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          loc.habits,
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    ..._buildSelectedDayHabits(_selectedDay!),
+                  ],
+
+                  // Якщо немає ні завдань, ні звичок
+                  if (_getTasksForDay(_selectedDay!).isEmpty &&
+                      _getHabitsForDay(_selectedDay!).isEmpty) ...[
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              Icon(Icons.event_busy,
+                                  size: 64, color: Colors.grey.shade400),
+                              const SizedBox(height: 16),
+                              Text(
+                                loc.emptyList,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle),
-                        tooltip: loc.addTask,
-                        onPressed: () => _openAddDialogForDate(_selectedDay!),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ..._buildSelectedDayTasks(_selectedDay!),
+                    ),
+                  ],
+
                   const SizedBox(height: 80),
                 ] else ...[
                   Center(
@@ -3696,14 +4228,33 @@ class _TaskListPageState extends State<TaskListPage>
 
             final date =
                 DateTime(_calendarMonth.year, _calendarMonth.month, dayNumber);
-            final tasksOnDay = _items
+
+            // Всі завдання на цей день (для підрахунку кольору)
+            final allTasksOnDay = _items
                 .where((i) =>
-                    i.createdAt.year == date.year &&
-                    i.createdAt.month == date.month &&
-                    i.createdAt.day == date.day)
+                    i.dueDate != null &&
+                    i.dueDate!.year == date.year &&
+                    i.dueDate!.month == date.month &&
+                    i.dueDate!.day == date.day)
                 .toList();
 
-            final completedOnDay = tasksOnDay.where((i) => i.completed).length;
+            final completedOnDay =
+                allTasksOnDay.where((i) => i.completed).length;
+            final totalOnDay = allTasksOnDay.length;
+
+            // Звички на цей день
+            final weekday = date.weekday;
+            final habitsOnDay = _habits
+                .where((h) => h.active && h.selectedDays.contains(weekday))
+                .toList();
+            final completedHabitsOnDay = habitsOnDay
+                .where((h) => h.completedDates.any((d) =>
+                    d.year == date.year &&
+                    d.month == date.month &&
+                    d.day == date.day))
+                .length;
+            final totalHabitsOnDay = habitsOnDay.length;
+
             final isToday = date.year == DateTime.now().year &&
                 date.month == DateTime.now().month &&
                 date.day == DateTime.now().day;
@@ -3735,6 +4286,7 @@ class _TaskListPageState extends State<TaskListPage>
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       dayNumber.toString(),
@@ -3742,30 +4294,46 @@ class _TaskListPageState extends State<TaskListPage>
                         fontWeight: isToday || isSelected
                             ? FontWeight.bold
                             : FontWeight.normal,
-                        fontSize: 14,
+                        fontSize: 12,
                         color: isSelected ? Colors.white : null,
                       ),
                     ),
-                    if (tasksOnDay.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: completedOnDay == tasksOnDay.length
-                                ? Colors.green
-                                : Colors.orange,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '$completedOnDay/${tasksOnDay.length}',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
+                    if (totalOnDay > 0 || totalHabitsOnDay > 0)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Точка для завдань
+                          if (totalOnDay > 0)
+                            Container(
+                              margin: const EdgeInsets.only(top: 2, right: 2),
+                              width: 5,
+                              height: 5,
+                              decoration: BoxDecoration(
+                                color: completedOnDay == totalOnDay
+                                    ? Colors.green
+                                    : completedOnDay > 0
+                                        ? Colors.orange
+                                        : Colors.blue,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          // Точка для звичок
+                          if (totalHabitsOnDay > 0)
+                            Container(
+                              margin: const EdgeInsets.only(top: 2, left: 2),
+                              width: 5,
+                              height: 5,
+                              decoration: BoxDecoration(
+                                color: completedHabitsOnDay == totalHabitsOnDay
+                                    ? Colors.green
+                                    : completedHabitsOnDay > 0
+                                        ? Colors.orange
+                                        : Colors.purple,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                        ],
                       ),
                   ],
                 ),
@@ -3793,53 +4361,134 @@ class _TaskListPageState extends State<TaskListPage>
         .length;
   }
 
-  List<Widget> _buildSelectedDayTasks(DateTime selectedDay) {
-    final tasksForDay = _items
+  List<TaskItem> _getTasksForDay(DateTime day) {
+    return _items
         .where((i) =>
-            i.createdAt.year == selectedDay.year &&
-            i.createdAt.month == selectedDay.month &&
-            i.createdAt.day == selectedDay.day)
+            i.dueDate != null &&
+            i.dueDate!.year == day.year &&
+            i.dueDate!.month == day.month &&
+            i.dueDate!.day == day.day &&
+            (_showCompletedTasks || !i.completed))
         .toList();
+  }
 
-    if (tasksForDay.isEmpty) {
-      return [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(Icons.event_busy, size: 64, color: Colors.grey.shade400),
-                  const SizedBox(height: 16),
-                  Text(
-                    AppLocalizations.of(context).emptyList,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    AppLocalizations.of(context).addFirstTask,
-                    style: const TextStyle(color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+  List<Habit> _getHabitsForDay(DateTime day) {
+    final weekday = day.weekday; // 1=Monday, 7=Sunday
+    return _habits
+        .where((h) => h.active && h.selectedDays.contains(weekday))
+        .toList();
+  }
+
+  List<Widget> _buildSelectedDayHabits(DateTime selectedDay) {
+    final habitsForDay = _getHabitsForDay(selectedDay);
+    final loc = AppLocalizations.of(context);
+
+    return habitsForDay.map((habit) {
+      final isCompleted = habit.completedDates.any((d) =>
+          d.year == selectedDay.year &&
+          d.month == selectedDay.month &&
+          d.day == selectedDay.day);
+
+      return Card(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        child: ListTile(
+          leading: Icon(
+            isCompleted ? Icons.check_circle : Icons.circle_outlined,
+            color: isCompleted ? Colors.green : Colors.grey,
+            size: 32,
+          ),
+          title: Text(
+            habit.name,
+            style: TextStyle(
+              decoration: isCompleted ? TextDecoration.lineThrough : null,
+              color: isCompleted ? Colors.grey : null,
             ),
           ),
+          subtitle: habit.description != null && habit.description!.isNotEmpty
+              ? Text(habit.description!,
+                  maxLines: 1, overflow: TextOverflow.ellipsis)
+              : null,
+          trailing:
+              Icon(habit.icon, color: Theme.of(context).colorScheme.primary),
+          onTap: () {
+            setState(() {
+              if (isCompleted) {
+                habit.completedDates.removeWhere((d) =>
+                    d.year == selectedDay.year &&
+                    d.month == selectedDay.month &&
+                    d.day == selectedDay.day);
+              } else {
+                habit.completedDates.add(selectedDay);
+              }
+            });
+            _saveData();
+          },
         ),
-      ];
+      );
+    }).toList();
+  }
+
+  List<Widget> _buildSelectedDayTasks(DateTime selectedDay) {
+    final tasksForDay = _getTasksForDay(selectedDay);
+
+    if (tasksForDay.isEmpty) {
+      return [];
     }
 
+    final loc = AppLocalizations.of(context);
+
     return tasksForDay
-        .map((it) => TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.0),
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, child) {
-                return Transform.scale(
-                  scale: value,
-                  child: Opacity(
-                    opacity: value,
-                    child: child,
+        .map((it) => Dismissible(
+              key: ValueKey('calendar_${it.id}'),
+              direction: DismissDirection.horizontal,
+              background: Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: const Icon(Icons.edit, color: Colors.white),
+              ),
+              secondaryBackground: Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: const Icon(Icons.delete, color: Colors.white),
+              ),
+              confirmDismiss: (direction) async {
+                if (direction == DismissDirection.startToEnd) {
+                  // Редагування
+                  _openEditTaskDialog(it);
+                  return false;
+                } else {
+                  // Видалення
+                  return true;
+                }
+              },
+              onDismissed: (direction) {
+                setState(() {
+                  _items.remove(it);
+                });
+                _saveData();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${loc.deletedTask}: ${it.name}'),
+                    behavior: SnackBarBehavior.floating,
+                    action: SnackBarAction(
+                      label: loc.undo,
+                      onPressed: () {
+                        setState(() {
+                          _items.add(it);
+                        });
+                        _saveData();
+                      },
+                    ),
                   ),
                 );
               },
@@ -3875,49 +4524,44 @@ class _TaskListPageState extends State<TaskListPage>
                   ),
                   subtitle: Row(
                     children: [
-                      if (it.priority != null)
-                        Chip(
-                          label: Text(it.priority!,
-                              style: const TextStyle(fontSize: 10)),
-                          visualDensity: VisualDensity.compact,
+                      if (it.priority != null) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _getPriorityColor(it.priority),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            it.priority == TaskPriority.low
+                                ? 'Низький'
+                                : it.priority == TaskPriority.medium
+                                    ? 'Середній'
+                                    : 'Високий',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                      if (it.priority != null) const SizedBox(width: 4),
-                      Chip(
-                        label: Text(categoryLabel(it.category, context),
-                            style: const TextStyle(fontSize: 10)),
-                        visualDensity: VisualDensity.compact,
-                      ),
+                      ],
                     ],
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (it.favorite)
-                        TweenAnimationBuilder<double>(
-                          tween: Tween(begin: 0.8, end: 1.0),
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.elasticOut,
-                          builder: (context, scale, child) {
-                            return Transform.scale(
-                              scale: scale,
-                              child: child,
-                            );
-                          },
-                          child: const Icon(Icons.star,
-                              color: Colors.amber, size: 20),
-                        ),
-                      const SizedBox(width: 8),
-                      Checkbox(
-                        value: it.completed,
-                        onChanged: (_) => setState(() {
-                          it.completed = !it.completed;
-                          _saveData();
-                        }),
-                      ),
+                        const Icon(Icons.star, color: Colors.amber, size: 20),
                     ],
                   ),
                   onTap: () => setState(() {
                     it.completed = !it.completed;
+                    if (it.completed) {
+                      it.completedAt = DateTime.now();
+                    } else {
+                      it.completedAt = null;
+                    }
                     _saveData();
                   }),
                 ),
@@ -3963,8 +4607,19 @@ class _TaskListPageState extends State<TaskListPage>
                 final streak = _calculateStreak(habit);
                 return Dismissible(
                   key: Key(habit.name + habit.completedDates.length.toString()),
-                  direction: DismissDirection.endToStart,
+                  direction: DismissDirection.horizontal,
                   background: Container(
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.only(left: 20),
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.edit, color: Colors.white),
+                  ),
+                  secondaryBackground: Container(
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: 20),
                     margin:
@@ -3975,6 +4630,13 @@ class _TaskListPageState extends State<TaskListPage>
                     ),
                     child: const Icon(Icons.delete, color: Colors.white),
                   ),
+                  confirmDismiss: (direction) async {
+                    if (direction == DismissDirection.startToEnd) {
+                      _openEditHabitDialog(habit);
+                      return false;
+                    }
+                    return true;
+                  },
                   onDismissed: (direction) {
                     setState(() {
                       _habits.remove(habit);
@@ -4011,12 +4673,18 @@ class _TaskListPageState extends State<TaskListPage>
                               style: const TextStyle(fontSize: 12)),
                           Row(
                             children: [
-                              const Text('Дні: ',
-                                  style: TextStyle(fontSize: 11)),
-                              ...['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
-                                  .asMap()
-                                  .entries
-                                  .map((entry) {
+                              Text(
+                                  '${AppLocalizations.of(context).translate('days') ?? 'Дні'}: ',
+                                  style: const TextStyle(fontSize: 11)),
+                              ...[
+                                AppLocalizations.of(context).mon,
+                                AppLocalizations.of(context).tue,
+                                AppLocalizations.of(context).wed,
+                                AppLocalizations.of(context).thu,
+                                AppLocalizations.of(context).fri,
+                                AppLocalizations.of(context).sat,
+                                AppLocalizations.of(context).sun
+                              ].asMap().entries.map((entry) {
                                 final dayNumber = entry.key + 1;
                                 final isSelected =
                                     habit.selectedDays.contains(dayNumber);
@@ -4030,8 +4698,8 @@ class _TaskListPageState extends State<TaskListPage>
                                           ? FontWeight.bold
                                           : FontWeight.normal,
                                       color: isSelected
-                                          ? Theme.of(context).primaryColor
-                                          : Colors.grey,
+                                          ? Colors.white
+                                          : Colors.black,
                                     ),
                                   ),
                                 );
@@ -4042,6 +4710,12 @@ class _TaskListPageState extends State<TaskListPage>
                           Text('${loc.streak}: $streak ${loc.days}',
                               style: const TextStyle(
                                   fontSize: 12, fontWeight: FontWeight.bold)),
+                          if (habit.reminderTime != null)
+                            Text(
+                              '⏰ ${habit.reminderTime!.hour.toString().padLeft(2, '0')}:${habit.reminderTime!.minute.toString().padLeft(2, '0')}',
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.blue),
+                            ),
                         ],
                       ),
                       trailing: habit.isActiveToday()
@@ -4070,32 +4744,27 @@ class _TaskListPageState extends State<TaskListPage>
                             )
                           : const Icon(Icons.remove_circle_outline,
                               color: Colors.grey),
-                      onLongPress: () => _openEditHabitDialog(habit),
+                      onTap: () {
+                        if (habit.isActiveToday()) {
+                          setState(() {
+                            if (habit.isCompletedToday()) {
+                              habit.completedDates.removeWhere((d) =>
+                                  d.year == DateTime.now().year &&
+                                  d.month == DateTime.now().month &&
+                                  d.day == DateTime.now().day);
+                            } else {
+                              habit.completedDates.add(DateTime.now());
+                            }
+                          });
+                          _saveData();
+                        }
+                      },
                     ),
                   ),
                 );
               }).toList(),
             ),
     );
-  }
-
-  int _calculateStreak(Habit habit) {
-    if (habit.completedDates.isEmpty) return 0;
-    final sorted = habit.completedDates..sort((a, b) => b.compareTo(a));
-    int streak = 0;
-    var current = DateTime.now();
-
-    for (final date in sorted) {
-      if (date.year == current.year &&
-          date.month == current.month &&
-          date.day == current.day) {
-        streak++;
-        current = current.subtract(const Duration(days: 1));
-      } else {
-        break;
-      }
-    }
-    return streak;
   }
 
   int _getTodayTasksCount() {
@@ -4119,7 +4788,8 @@ class _TaskListPageState extends State<TaskListPage>
     final descCtrl = TextEditingController();
     var selectedFreq = HabitFrequency.daily;
     var selectedIcon = Icons.check_circle;
-    var selectedDays = <int>[1, 2, 3, 4, 5, 6, 7];
+    var selectedDays = <int>[1, 2, 3, 4, 5, 6, 7]; // For daily frequency
+    TimeOfDay? selectedReminderTime;
 
     final availableIcons = [
       Icons.check_circle,
@@ -4142,7 +4812,15 @@ class _TaskListPageState extends State<TaskListPage>
       Icons.videogame_asset,
     ];
 
-    final dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+    final dayNames = [
+      loc.mon,
+      loc.tue,
+      loc.wed,
+      loc.thu,
+      loc.fri,
+      loc.sat,
+      loc.sun
+    ];
 
     showDialog<void>(
       context: context,
@@ -4176,55 +4854,67 @@ class _TaskListPageState extends State<TaskListPage>
                     if (f != null) {
                       setState(() {
                         selectedFreq = f;
+                        if (f == HabitFrequency.daily) {
+                          selectedDays = [1, 2, 3, 4, 5, 6, 7];
+                        } else if (f == HabitFrequency.weekly) {
+                          selectedDays = [];
+                        }
                       });
                     }
                   },
                 ),
-                const SizedBox(height: 16),
-                Text('Дні тижня:',
-                    style: Theme.of(context).textTheme.labelLarge),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: List.generate(7, (index) {
-                    final dayNumber = index + 1;
-                    final isSelected = selectedDays.contains(dayNumber);
-                    return InkWell(
-                      onTap: () {
-                        setState(() {
-                          if (isSelected) {
-                            selectedDays.remove(dayNumber);
-                          } else {
-                            selectedDays.add(dayNumber);
-                          }
-                        });
-                      },
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? Theme.of(context).primaryColor
-                              : Colors.grey[200],
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            dayNames[index],
-                            style: TextStyle(
-                              color:
-                                  isSelected ? Colors.white : Colors.grey[700],
-                              fontWeight: FontWeight.bold,
+                if (selectedFreq == HabitFrequency.weekly) ...[
+                  const SizedBox(height: 16),
+                  Text(loc.selectDays,
+                      style: Theme.of(context).textTheme.labelLarge),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: List.generate(7, (index) {
+                      final dayNumber = index + 1;
+                      final isSelected = selectedDays.contains(dayNumber);
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            if (isSelected) {
+                              selectedDays.remove(dayNumber);
+                            } else {
+                              selectedDays.add(dayNumber);
+                            }
+                          });
+                        },
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: isSelected ? Colors.white : Colors.grey[200],
+                            border: isSelected
+                                ? Border.all(
+                                    color: Theme.of(context).primaryColor,
+                                    width: 3,
+                                  )
+                                : null,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              dayNames[index],
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Theme.of(context).primaryColor
+                                    : Colors.grey[700],
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  }),
-                ),
+                      );
+                    }),
+                  ),
+                ],
                 const SizedBox(height: 16),
-                Text('Іконка:', style: Theme.of(context).textTheme.labelLarge),
+                Text(loc.icon, style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -4254,6 +4944,46 @@ class _TaskListPageState extends State<TaskListPage>
                     );
                   }).toList(),
                 ),
+                const SizedBox(height: 16),
+                // Нагадування
+                OutlinedButton.icon(
+                  icon: Icon(
+                    selectedReminderTime != null
+                        ? Icons.check_circle
+                        : Icons.alarm,
+                    color: selectedReminderTime != null ? Colors.green : null,
+                  ),
+                  label: Text(selectedReminderTime == null
+                      ? loc.addReminder
+                      : '⏰ ${selectedReminderTime!.hour.toString().padLeft(2, '0')}:${selectedReminderTime!.minute.toString().padLeft(2, '0')}'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    backgroundColor: selectedReminderTime != null
+                        ? Colors.blue.shade50
+                        : null,
+                  ),
+                  onPressed: () async {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: selectedReminderTime ??
+                          const TimeOfDay(hour: 9, minute: 0),
+                    );
+                    if (time != null) {
+                      setState(() => selectedReminderTime = time);
+                    }
+                  },
+                ),
+                if (selectedReminderTime != null)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.clear, size: 16),
+                      label: const Text('Прибрати'),
+                      onPressed: () {
+                        setState(() => selectedReminderTime = null);
+                      },
+                    ),
+                  ),
               ],
             ),
           ),
@@ -4271,18 +5001,26 @@ class _TaskListPageState extends State<TaskListPage>
                   );
                   return;
                 }
+                final newHabit = Habit(
+                  name: name,
+                  description: descCtrl.text.trim().isEmpty
+                      ? null
+                      : descCtrl.text.trim(),
+                  frequency: selectedFreq,
+                  icon: selectedIcon,
+                  selectedDays: selectedDays,
+                  reminderTime: selectedReminderTime,
+                );
                 this.setState(() {
-                  _habits.add(Habit(
-                    name: name,
-                    description: descCtrl.text.trim().isEmpty
-                        ? null
-                        : descCtrl.text.trim(),
-                    frequency: selectedFreq,
-                    icon: selectedIcon,
-                    selectedDays: selectedDays,
-                  ));
+                  _habits.add(newHabit);
                 });
                 _saveData();
+
+                // Плануємо нагадування
+                if (selectedReminderTime != null) {
+                  _scheduleHabitReminders(newHabit);
+                }
+
                 Navigator.of(ctx).pop();
               },
               child: Text(loc.add),
@@ -4300,6 +5038,7 @@ class _TaskListPageState extends State<TaskListPage>
     var selectedFreq = habit.frequency;
     var selectedIcon = habit.icon;
     var selectedDays = List<int>.from(habit.selectedDays);
+    TimeOfDay? selectedReminderTime = habit.reminderTime;
 
     final availableIcons = [
       Icons.check_circle,
@@ -4322,13 +5061,21 @@ class _TaskListPageState extends State<TaskListPage>
       Icons.videogame_asset,
     ];
 
-    final dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+    final dayNames = [
+      loc.mon,
+      loc.tue,
+      loc.wed,
+      loc.thu,
+      loc.fri,
+      loc.sat,
+      loc.sun
+    ];
 
     showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Edytuj nawyk'),
+          title: Text(loc.editHabit),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -4356,55 +5103,67 @@ class _TaskListPageState extends State<TaskListPage>
                     if (f != null) {
                       setState(() {
                         selectedFreq = f;
+                        if (f == HabitFrequency.daily) {
+                          selectedDays = [1, 2, 3, 4, 5, 6, 7];
+                        } else if (f == HabitFrequency.weekly) {
+                          selectedDays = [];
+                        }
                       });
                     }
                   },
                 ),
-                const SizedBox(height: 16),
-                Text('Дні тижня:',
-                    style: Theme.of(context).textTheme.labelLarge),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: List.generate(7, (index) {
-                    final dayNumber = index + 1;
-                    final isSelected = selectedDays.contains(dayNumber);
-                    return InkWell(
-                      onTap: () {
-                        setState(() {
-                          if (isSelected) {
-                            selectedDays.remove(dayNumber);
-                          } else {
-                            selectedDays.add(dayNumber);
-                          }
-                        });
-                      },
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? Theme.of(context).primaryColor
-                              : Colors.grey[200],
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            dayNames[index],
-                            style: TextStyle(
-                              color:
-                                  isSelected ? Colors.white : Colors.grey[700],
-                              fontWeight: FontWeight.bold,
+                if (selectedFreq == HabitFrequency.weekly) ...[
+                  const SizedBox(height: 16),
+                  Text(loc.selectDays,
+                      style: Theme.of(context).textTheme.labelLarge),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: List.generate(7, (index) {
+                      final dayNumber = index + 1;
+                      final isSelected = selectedDays.contains(dayNumber);
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            if (isSelected) {
+                              selectedDays.remove(dayNumber);
+                            } else {
+                              selectedDays.add(dayNumber);
+                            }
+                          });
+                        },
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: isSelected ? Colors.white : Colors.grey[200],
+                            border: isSelected
+                                ? Border.all(
+                                    color: Theme.of(context).primaryColor,
+                                    width: 3,
+                                  )
+                                : null,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              dayNames[index],
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Theme.of(context).primaryColor
+                                    : Colors.grey[700],
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  }),
-                ),
+                      );
+                    }),
+                  ),
+                ],
                 const SizedBox(height: 16),
-                Text('Іконка:', style: Theme.of(context).textTheme.labelLarge),
+                Text(loc.icon, style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -4434,6 +5193,46 @@ class _TaskListPageState extends State<TaskListPage>
                     );
                   }).toList(),
                 ),
+                const SizedBox(height: 16),
+                // Нагадування
+                OutlinedButton.icon(
+                  icon: Icon(
+                    selectedReminderTime != null
+                        ? Icons.check_circle
+                        : Icons.alarm,
+                    color: selectedReminderTime != null ? Colors.green : null,
+                  ),
+                  label: Text(selectedReminderTime == null
+                      ? loc.addReminder
+                      : '⏰ ${selectedReminderTime!.hour.toString().padLeft(2, '0')}:${selectedReminderTime!.minute.toString().padLeft(2, '0')}'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    backgroundColor: selectedReminderTime != null
+                        ? Colors.blue.shade50
+                        : null,
+                  ),
+                  onPressed: () async {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: selectedReminderTime ??
+                          const TimeOfDay(hour: 9, minute: 0),
+                    );
+                    if (time != null) {
+                      setState(() => selectedReminderTime = time);
+                    }
+                  },
+                ),
+                if (selectedReminderTime != null)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.clear, size: 16),
+                      label: const Text('Прибрати'),
+                      onPressed: () {
+                        setState(() => selectedReminderTime = null);
+                      },
+                    ),
+                  ),
               ],
             ),
           ),
@@ -4451,6 +5250,10 @@ class _TaskListPageState extends State<TaskListPage>
                   );
                   return;
                 }
+
+                // Скасовуємо старі нагадування
+                _cancelHabitReminders(habit);
+
                 this.setState(() {
                   habit.name = name;
                   habit.description = descCtrl.text.trim().isEmpty
@@ -4459,11 +5262,18 @@ class _TaskListPageState extends State<TaskListPage>
                   habit.frequency = selectedFreq;
                   habit.icon = selectedIcon;
                   habit.selectedDays = selectedDays;
+                  habit.reminderTime = selectedReminderTime;
                 });
                 _saveData();
+
+                // Плануємо нові нагадування
+                if (selectedReminderTime != null) {
+                  _scheduleHabitReminders(habit);
+                }
+
                 Navigator.of(ctx).pop();
               },
-              child: Text(loc.add),
+              child: Text(loc.translate('save') ?? 'Зберегти'),
             ),
           ],
         ),
@@ -4540,11 +5350,15 @@ class _StatsCard extends StatelessWidget {
           Row(
             children: [
               Icon(icon,
-                  size: 18, color: Theme.of(context).colorScheme.onSurface),
-              const SizedBox(width: 6),
-              Text(label,
-                  style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface)),
+                  size: 16, color: Theme.of(context).colorScheme.onSurface),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurface)),
+              ),
             ],
           ),
           const SizedBox(height: 6),
@@ -5146,32 +5960,46 @@ class _AuthPageState extends State<AuthPage> {
 
     setState(() => _isLoading = true);
 
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
     try {
       if (_isLogin) {
-        await _authService.signIn(
-            _emailController.text, _passwordController.text);
+        await _authService.signIn(email, password);
       } else {
-        await _authService.signUp(
-            _emailController.text, _passwordController.text);
+        await _authService.signUp(email, password);
+        _showMessage('✅ Успішно зареєстровано!');
       }
-    } on FirebaseAuthException catch (e) {
+    } catch (e) {
       String message = 'Помилка';
-      if (e.code == 'user-not-found') {
-        message = 'Користувача не знайдено';
-      } else if (e.code == 'wrong-password') {
+      final errorMsg = e.toString().toLowerCase();
+
+      if (errorMsg.contains('user not found') ||
+          errorMsg.contains('invalid login') ||
+          errorMsg.contains('invalid_credentials')) {
+        message = 'Невірний email або пароль';
+      } else if (errorMsg.contains('invalid password') ||
+          errorMsg.contains('wrong password')) {
         message = 'Невірний пароль';
-      } else if (e.code == 'email-already-in-use') {
+      } else if (errorMsg.contains('already registered') ||
+          errorMsg.contains('already in use') ||
+          errorMsg.contains('user_already_exists')) {
         message = 'Email вже використовується';
-      } else if (e.code == 'weak-password') {
+      } else if (errorMsg.contains('weak password') ||
+          errorMsg.contains('password is too short') ||
+          errorMsg.contains('password should be at least')) {
         message = 'Пароль занадто слабкий (мінімум 6 символів)';
-      } else if (e.code == 'invalid-email') {
-        message = 'Невірний формат email';
+      } else if (errorMsg.contains('invalid email') ||
+          errorMsg.contains('invalid_email') ||
+          errorMsg.contains('unable to validate email') ||
+          errorMsg.contains('invalid format')) {
+        message = 'Невірний формат email. Перевірте правильність введення';
+      } else if (errorMsg.contains('email not confirmed')) {
+        message = 'Підтвердіть email. Перевірте пошту';
       } else {
-        message = 'Помилка: ${e.code} - ${e.message}';
+        message = 'Помилка входу. Спробуйте ще раз';
       }
       _showMessage(message);
-    } catch (e) {
-      _showMessage('Помилка: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -5301,67 +6129,6 @@ class _AuthPageState extends State<AuthPage> {
                           _isLogin
                               ? 'Немає акаунта? Зареєструватися'
                               : 'Вже є акаунт? Увійти',
-                        ),
-                      ),
-                      const Divider(height: 32),
-                      // Google Sign-In
-                      const Text(
-                        'або',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: OutlinedButton.icon(
-                          onPressed: _isLoading
-                              ? null
-                              : () async {
-                                  setState(() => _isLoading = true);
-                                  try {
-                                    await _authService.signInWithGoogle();
-                                    // Успішний вхід - AuthPage автоматично закриється
-                                  } catch (e) {
-                                    if (mounted) {
-                                      _showMessage(e
-                                          .toString()
-                                          .replaceAll('Exception: ', ''));
-                                    }
-                                  } finally {
-                                    if (mounted)
-                                      setState(() => _isLoading = false);
-                                  }
-                                },
-                          icon: Container(
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                'G',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF4285F4),
-                                ),
-                              ),
-                            ),
-                          ),
-                          label: const Text(
-                            'Увійти через Google',
-                            style:
-                                TextStyle(fontSize: 16, color: Colors.black87),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            side: BorderSide(color: Colors.grey.shade300),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -5591,28 +6358,26 @@ class InboxPage extends StatelessWidget {
                                 const SizedBox(height: 4),
                                 Row(
                                   children: [
-                                    Icon(
-                                      Icons.label,
-                                      size: 16,
-                                      color:
-                                          _getCategoryColor(item.category.name),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(item.category.name),
-                                    if (item.priority != null &&
-                                        item.priority!.isNotEmpty) ...[
-                                      const SizedBox(width: 12),
-                                      ...List.generate(
-                                        int.tryParse(item.priority!) ?? 0,
-                                        (i) => const Icon(
-                                          Icons.flag,
-                                          size: 16,
-                                          color: Colors.red,
-                                        ),
+                                    if (item.priority != null) ...[
+                                      Icon(
+                                        Icons.flag,
+                                        size: 16,
+                                        color: _getPriorityColor(item.priority),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        item.priority == TaskPriority.low
+                                            ? 'Низький'
+                                            : item.priority ==
+                                                    TaskPriority.medium
+                                                ? 'Середній'
+                                                : 'Високий',
+                                        style: const TextStyle(fontSize: 12),
                                       ),
                                     ],
                                     if (item.dueDate != null) ...[
-                                      const SizedBox(width: 12),
+                                      if (item.priority != null)
+                                        const SizedBox(width: 12),
                                       Icon(
                                         Icons.calendar_today,
                                         size: 16,
@@ -5652,6 +6417,19 @@ class InboxPage extends StatelessWidget {
     );
   }
 
+  Color _getPriorityColor(TaskPriority? priority) {
+    switch (priority) {
+      case TaskPriority.low:
+        return Colors.blue;
+      case TaskPriority.medium:
+        return Colors.orange;
+      case TaskPriority.high:
+        return Colors.red;
+      case null:
+        return Colors.grey;
+    }
+  }
+
   Color _getCategoryColor(String category) {
     switch (category) {
       case 'work':
@@ -5662,7 +6440,6 @@ class InboxPage extends StatelessWidget {
       case 'Personal':
       case 'Особисте':
         return Colors.green;
-      case 'home':
       case 'Home':
       case 'Дім':
         return Colors.orange;
@@ -5727,6 +6504,19 @@ class TodayTasksPage extends StatelessWidget {
     }).toList();
   }
 
+  Color _getPriorityColor(TaskPriority? priority) {
+    switch (priority) {
+      case TaskPriority.low:
+        return Colors.blue;
+      case TaskPriority.medium:
+        return Colors.orange;
+      case TaskPriority.high:
+        return Colors.red;
+      case null:
+        return Colors.grey;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
@@ -5777,7 +6567,7 @@ class TodayTasksPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _formatDate(DateTime.now()),
+                  _formatDate(DateTime.now(), context),
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 16,
@@ -5901,24 +6691,21 @@ class TodayTasksPage extends StatelessWidget {
                                 const SizedBox(height: 4),
                                 Row(
                                   children: [
-                                    Icon(
-                                      Icons.label,
-                                      size: 16,
-                                      color:
-                                          _getCategoryColor(item.category.name),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(item.category.name),
-                                    if (item.priority != null &&
-                                        item.priority!.isNotEmpty) ...[
-                                      const SizedBox(width: 12),
-                                      ...List.generate(
-                                        int.tryParse(item.priority!) ?? 0,
-                                        (i) => const Icon(
-                                          Icons.flag,
-                                          size: 16,
-                                          color: Colors.red,
-                                        ),
+                                    if (item.priority != null) ...[
+                                      Icon(
+                                        Icons.flag,
+                                        size: 16,
+                                        color: _getPriorityColor(item.priority),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        item.priority == TaskPriority.low
+                                            ? 'Низький'
+                                            : item.priority ==
+                                                    TaskPriority.medium
+                                                ? 'Середній'
+                                                : 'Високий',
+                                        style: const TextStyle(fontSize: 12),
                                       ),
                                     ],
                                   ],
@@ -5978,21 +6765,30 @@ class TodayTasksPage extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime date) {
-    final days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+  String _formatDate(DateTime date, BuildContext context) {
+    final loc = AppLocalizations.of(context);
+    final days = [
+      loc.mon,
+      loc.tue,
+      loc.wed,
+      loc.thu,
+      loc.fri,
+      loc.sat,
+      loc.sun
+    ];
     final months = [
-      'січня',
-      'лютого',
-      'березня',
-      'квітня',
-      'травня',
-      'червня',
-      'липня',
-      'серпня',
-      'вересня',
-      'жовтня',
-      'листопада',
-      'грудня'
+      loc.january,
+      loc.february,
+      loc.march,
+      loc.april,
+      loc.may,
+      loc.june,
+      loc.july,
+      loc.august,
+      loc.september,
+      loc.october,
+      loc.november,
+      loc.december
     ];
 
     return '${days[date.weekday - 1]}, ${date.day} ${months[date.month - 1]}';
@@ -6020,6 +6816,8 @@ class StatisticsPage extends StatelessWidget {
   final int completedTasks;
   final int habitsCount;
   final int activeHabitsStreak;
+  final List<int> weeklyActivity; // Активність за останні 7 днів
+  final int archivedTasks;
 
   const StatisticsPage({
     super.key,
@@ -6027,6 +6825,8 @@ class StatisticsPage extends StatelessWidget {
     required this.completedTasks,
     required this.habitsCount,
     required this.activeHabitsStreak,
+    this.weeklyActivity = const [0, 0, 0, 0, 0, 0, 0],
+    this.archivedTasks = 0,
   });
 
   @override
@@ -6034,6 +6834,26 @@ class StatisticsPage extends StatelessWidget {
     final loc = AppLocalizations.of(context);
     final completionRate =
         totalTasks > 0 ? (completedTasks / totalTasks * 100).round() : 0;
+    final maxActivity = weeklyActivity.isEmpty
+        ? 1
+        : weeklyActivity.reduce((a, b) => a > b ? a : b);
+    final weekDays = [
+      loc.mon,
+      loc.tue,
+      loc.wed,
+      loc.thu,
+      loc.fri,
+      loc.sat,
+      loc.sun
+    ];
+
+    // Визначаємо дні тижня для відображення
+    final today = DateTime.now().weekday; // 1 = Monday, 7 = Sunday
+    final orderedDays = <String>[];
+    for (int i = 6; i >= 0; i--) {
+      final dayIndex = (today - 1 - i) % 7;
+      orderedDays.add(weekDays[dayIndex < 0 ? dayIndex + 7 : dayIndex]);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -6095,6 +6915,87 @@ class StatisticsPage extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
+
+              // Графік активності за тиждень
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.trending_up,
+                              color: Theme.of(context).colorScheme.primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            loc.monthStatistics,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 120,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: List.generate(7, (index) {
+                            final activity = weeklyActivity.length > index
+                                ? weeklyActivity[index]
+                                : 0;
+                            final height = maxActivity > 0
+                                ? (activity / maxActivity * 80).clamp(4.0, 80.0)
+                                : 4.0;
+                            return Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Text(
+                                  activity.toString(),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  width: 32,
+                                  height: height,
+                                  decoration: BoxDecoration(
+                                    color: activity > 0
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Colors.grey.shade300,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  orderedDays[index],
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: index == 6
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Colors.grey.shade600,
+                                    fontWeight: index == 6
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            );
+                          }),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
               // Прогрес виконання
               Card(
                 child: Padding(
@@ -6136,7 +7037,7 @@ class StatisticsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '$completedTasks з $totalTasks ${loc.tasksCompleted}',
+                        '$completedTasks / $totalTasks ${loc.tasksCompleted}',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade600,
@@ -6441,17 +7342,179 @@ class _PomodoroPageState extends State<PomodoroPage> {
   }
 }
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   final String? avatarBase64;
+  final String userName;
+  final void Function(String) onUserNameChanged;
+  final void Function(String?) onAvatarChanged;
 
   const ProfilePage({
     super.key,
     this.avatarBase64,
+    required this.userName,
+    required this.onUserNameChanged,
+    required this.onAvatarChanged,
   });
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  late String _currentName;
+  String? _currentAvatar;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentName = widget.userName;
+    _currentAvatar = widget.avatarBase64;
+  }
+
+  Future<void> _pickAvatar() async {
+    final loc = AppLocalizations.of(context);
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Вибрати з галереї'),
+              onTap: () async {
+                Navigator.pop(context);
+                final picker = ImagePicker();
+                final picked = await picker.pickImage(
+                  source: ImageSource.gallery,
+                  maxWidth: 512,
+                  maxHeight: 512,
+                  imageQuality: 80,
+                );
+                if (picked != null) {
+                  final bytes = await picked.readAsBytes();
+                  final base64 = base64Encode(bytes);
+                  setState(() {
+                    _currentAvatar = base64;
+                  });
+                  widget.onAvatarChanged(base64);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Аватарку змінено'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Зробити фото'),
+              onTap: () async {
+                Navigator.pop(context);
+                final picker = ImagePicker();
+                final picked = await picker.pickImage(
+                  source: ImageSource.camera,
+                  maxWidth: 512,
+                  maxHeight: 512,
+                  imageQuality: 80,
+                );
+                if (picked != null) {
+                  final bytes = await picked.readAsBytes();
+                  final base64 = base64Encode(bytes);
+                  setState(() {
+                    _currentAvatar = base64;
+                  });
+                  widget.onAvatarChanged(base64);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Аватарку змінено'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+            if (_currentAvatar != null)
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Видалити аватарку',
+                    style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _currentAvatar = null;
+                  });
+                  widget.onAvatarChanged(null);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Аватарку видалено'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditNameDialog() {
+    final controller = TextEditingController(text: _currentName);
+    final loc = AppLocalizations.of(context);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Змінити ім\'я'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: loc.user,
+            hintText: 'Введіть ваше ім\'я',
+            border: const OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.person),
+          ),
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(loc.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final newName = controller.text.trim();
+              setState(() {
+                _currentName = newName;
+              });
+              widget.onUserNameChanged(newName);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Ім\'я успішно змінено'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            child: const Text('Зберегти'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
+    final displayName = _currentName.isEmpty ? loc.user : _currentName;
 
     return Scaffold(
       appBar: AppBar(
@@ -6478,27 +7541,75 @@ class ProfilePage extends StatelessWidget {
                 padding: const EdgeInsets.all(32.0),
                 child: Column(
                   children: [
-                    CircleAvatar(
-                      radius: 60,
-                      backgroundColor: Colors.white,
-                      backgroundImage: avatarBase64 != null
-                          ? MemoryImage(base64Decode(avatarBase64!))
-                          : null,
-                      child: avatarBase64 == null
-                          ? Icon(
-                              Icons.person,
-                              size: 70,
-                              color: Theme.of(context).colorScheme.primary,
-                            )
-                          : null,
+                    GestureDetector(
+                      onTap: _pickAvatar,
+                      child: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 60,
+                            backgroundColor: Colors.white,
+                            backgroundImage: _currentAvatar != null
+                                ? MemoryImage(base64Decode(_currentAvatar!))
+                                : null,
+                            child: _currentAvatar == null
+                                ? Icon(
+                                    Icons.person,
+                                    size: 70,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                  )
+                                : null,
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary,
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      loc.user,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
+                    GestureDetector(
+                      onTap: _showEditNameDialog,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            displayName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.edit,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -6528,7 +7639,8 @@ class ProfilePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   FutureBuilder<User?>(
-                    future: Future.value(FirebaseAuth.instance.currentUser),
+                    future:
+                        Future.value(Supabase.instance.client.auth.currentUser),
                     builder: (context, snapshot) {
                       final user = snapshot.data;
                       if (user != null) {
@@ -6555,8 +7667,7 @@ class ProfilePage extends StatelessWidget {
                                       color: Colors.white),
                                 ),
                                 title: Text(loc.account),
-                                subtitle:
-                                    const Text('Дані синхронізуються з хмарою'),
+                                subtitle: Text(loc.cloudSync),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -6675,12 +7786,20 @@ class AchievementsPage extends StatelessWidget {
   final int totalTasks;
   final int completedTasks;
   final int habitsCount;
+  final bool hasNightTask;
+  final bool hasEarlyTask;
+  final bool hasSameDayTask;
+  final int maxHabitStreak;
 
   const AchievementsPage({
     super.key,
     required this.totalTasks,
     required this.completedTasks,
     required this.habitsCount,
+    this.hasNightTask = false,
+    this.hasEarlyTask = false,
+    this.hasSameDayTask = false,
+    this.maxHabitStreak = 0,
   });
 
   @override
@@ -6742,7 +7861,7 @@ class AchievementsPage extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               Text(
-                'Ваші досягнення',
+                loc.yourAchievements,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 16),
@@ -6772,10 +7891,58 @@ class AchievementsPage extends StatelessWidget {
               const SizedBox(height: 12),
               _buildAchievementCard(
                 context,
+                Icons.diamond,
+                loc.perfectionist,
+                loc.perfectionistDesc,
+                completedTasks >= 100,
+              ),
+              const SizedBox(height: 12),
+              _buildAchievementCard(
+                context,
                 Icons.favorite,
                 loc.habitMaster,
                 loc.habitMasterDesc,
                 habitsCount >= 5,
+              ),
+              const SizedBox(height: 12),
+              _buildAchievementCard(
+                context,
+                Icons.local_fire_department,
+                loc.streakMaster,
+                loc.streakMasterDesc,
+                maxHabitStreak >= 7,
+              ),
+              const SizedBox(height: 12),
+              _buildAchievementCard(
+                context,
+                Icons.nightlight_round,
+                loc.nightOwl,
+                loc.nightOwlDesc,
+                hasNightTask,
+              ),
+              const SizedBox(height: 12),
+              _buildAchievementCard(
+                context,
+                Icons.wb_sunny,
+                loc.earlyBird,
+                loc.earlyBirdDesc,
+                hasEarlyTask,
+              ),
+              const SizedBox(height: 12),
+              _buildAchievementCard(
+                context,
+                Icons.bolt,
+                loc.speedRunner,
+                loc.speedRunnerDesc,
+                hasSameDayTask,
+              ),
+              const SizedBox(height: 12),
+              _buildAchievementCard(
+                context,
+                Icons.star,
+                loc.collector,
+                loc.collectorDesc,
+                _unlockedCount() >= 9,
               ),
             ],
           ),
@@ -6789,11 +7956,16 @@ class AchievementsPage extends StatelessWidget {
     if (totalTasks > 0) count++;
     if (completedTasks >= 10) count++;
     if (completedTasks >= 50) count++;
+    if (completedTasks >= 100) count++;
     if (habitsCount >= 5) count++;
+    if (maxHabitStreak >= 7) count++;
+    if (hasNightTask) count++;
+    if (hasEarlyTask) count++;
+    if (hasSameDayTask) count++;
     return count;
   }
 
-  int _totalAchievements() => 4;
+  int _totalAchievements() => 10;
 
   Widget _buildAchievementCard(
     BuildContext context,
@@ -6877,10 +8049,12 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _autoArchiveEnabled = false;
   bool _showCompletedTasks = true;
   bool _developerMode = false;
+  late ThemeMode _currentTheme;
 
   @override
   void initState() {
     super.initState();
+    _currentTheme = widget.themeMode;
     _loadSettings();
   }
 
@@ -6924,12 +8098,19 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _resetApp() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
-    widget.onThemeChanged(ThemeMode.system);
+    _changeTheme(ThemeMode.system);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Налаштування скинуто')),
       );
     }
+  }
+
+  void _changeTheme(ThemeMode mode) {
+    setState(() {
+      _currentTheme = mode;
+    });
+    widget.onThemeChanged(mode);
   }
 
   @override
@@ -6961,16 +8142,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   _saveSetting('show_completed', val);
                 },
               ),
-              SwitchListTile(
-                secondary: const Icon(Icons.archive_outlined),
-                title: Text(loc.autoArchive),
-                subtitle: Text(loc.autoArchiveDesc),
-                value: _autoArchiveEnabled,
-                onChanged: (val) {
-                  setState(() => _autoArchiveEnabled = val);
-                  _saveSetting('auto_archive', val);
-                },
-              ),
             ],
           ),
           const Divider(),
@@ -6986,54 +8157,30 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: Text(loc.lightTheme),
                 trailing: Radio<ThemeMode>(
                   value: ThemeMode.light,
-                  groupValue: widget.themeMode,
-                  onChanged: (v) {
-                    if (v != null) {
-                      widget.onThemeChanged(v);
-                      setState(() {});
-                    }
-                  },
+                  groupValue: _currentTheme,
+                  onChanged: (v) => _changeTheme(ThemeMode.light),
                 ),
-                onTap: () {
-                  widget.onThemeChanged(ThemeMode.light);
-                  setState(() {});
-                },
+                onTap: () => _changeTheme(ThemeMode.light),
               ),
               ListTile(
                 leading: const Icon(Icons.dark_mode),
                 title: Text(loc.darkTheme),
                 trailing: Radio<ThemeMode>(
                   value: ThemeMode.dark,
-                  groupValue: widget.themeMode,
-                  onChanged: (v) {
-                    if (v != null) {
-                      widget.onThemeChanged(v);
-                      setState(() {});
-                    }
-                  },
+                  groupValue: _currentTheme,
+                  onChanged: (v) => _changeTheme(ThemeMode.dark),
                 ),
-                onTap: () {
-                  widget.onThemeChanged(ThemeMode.dark);
-                  setState(() {});
-                },
+                onTap: () => _changeTheme(ThemeMode.dark),
               ),
               ListTile(
                 leading: const Icon(Icons.phone_android),
                 title: Text(loc.systemTheme),
                 trailing: Radio<ThemeMode>(
                   value: ThemeMode.system,
-                  groupValue: widget.themeMode,
-                  onChanged: (v) {
-                    if (v != null) {
-                      widget.onThemeChanged(v);
-                      setState(() {});
-                    }
-                  },
+                  groupValue: _currentTheme,
+                  onChanged: (v) => _changeTheme(ThemeMode.system),
                 ),
-                onTap: () {
-                  widget.onThemeChanged(ThemeMode.system);
-                  setState(() {});
-                },
+                onTap: () => _changeTheme(ThemeMode.system),
               ),
             ],
           ),
@@ -7048,24 +8195,12 @@ class _SettingsPageState extends State<SettingsPage> {
               SwitchListTile(
                 secondary: const Icon(Icons.notifications_active),
                 title: Text(loc.enableNotifications),
-                subtitle: const Text('Отримувати нагадування про завдання'),
+                subtitle: Text(loc.notificationsSubtitle),
                 value: _notificationsEnabled,
                 onChanged: (val) {
                   setState(() => _notificationsEnabled = val);
                   _saveSetting('notifications_enabled', val);
                 },
-              ),
-              SwitchListTile(
-                secondary: const Icon(Icons.volume_up),
-                title: Text(loc.notificationSound),
-                subtitle: const Text('Звуковий сигнал при нагадуванні'),
-                value: _notificationSoundEnabled,
-                onChanged: _notificationsEnabled
-                    ? (val) {
-                        setState(() => _notificationSoundEnabled = val);
-                        _saveSetting('notification_sound', val);
-                      }
-                    : null,
               ),
             ],
           ),
@@ -7081,216 +8216,12 @@ class _SettingsPageState extends State<SettingsPage> {
                   widget.onLanguageChanged),
               _buildLanguageTile(context, 'Українська', 'uk', currentLocale,
                   widget.onLanguageChanged),
-              _buildLanguageTile(context, 'Русский', 'ru', currentLocale,
-                  widget.onLanguageChanged),
               _buildLanguageTile(context, 'English', 'en', currentLocale,
                   widget.onLanguageChanged),
               _buildLanguageTile(context, 'Deutsch', 'de', currentLocale,
                   widget.onLanguageChanged),
               _buildLanguageTile(context, 'Español', 'es', currentLocale,
                   widget.onLanguageChanged),
-            ],
-          ),
-          const Divider(),
-
-          // Категорії
-          _buildSection(
-            context,
-            loc.category,
-            Icons.category,
-            [
-              ListTile(
-                leading: const Icon(Icons.edit),
-                title: const Text('Керування категоріями'),
-                subtitle: Text(
-                    '${widget.customCategories.length} ${loc.category.toLowerCase()}'),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (ctx) => CategoriesManagementPage(
-                        categories: widget.customCategories,
-                        onSave: widget.onCategoriesChanged,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-          const Divider(),
-
-          // Резервна копія
-          _buildSection(
-            context,
-            loc.backup,
-            Icons.backup,
-            [
-              ListTile(
-                leading: const Icon(Icons.file_download),
-                title: Text(loc.exportData),
-                subtitle: Text(loc.backupDesc),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: _exportData,
-              ),
-              ListTile(
-                leading: const Icon(Icons.file_upload),
-                title: Text(loc.importData),
-                subtitle: const Text('Відновити дані з файлу'),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Функція в розробці')),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.cloud_sync),
-                title: const Text('Синхронізація з хмарою'),
-                subtitle: FutureBuilder<User?>(
-                  future: Future.value(FirebaseAuth.instance.currentUser),
-                  builder: (context, snapshot) {
-                    if (snapshot.data != null) {
-                      return Text('Увімкнено: ${snapshot.data!.email}');
-                    }
-                    return const Text('Локальний режим');
-                  },
-                ),
-              ),
-            ],
-          ),
-          const Divider(),
-
-          // Дані
-          _buildSection(
-            context,
-            loc.data,
-            Icons.storage,
-            [
-              ListTile(
-                leading: const Icon(Icons.info_outline),
-                title: Text(loc.statistics),
-                subtitle: Text(
-                    '${loc.totalTasks}: ${widget.totalTasks}\n${loc.archive}: ${widget.archivedCount}'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_sweep),
-                title: Text(loc.clearTasks),
-                subtitle: Text(loc.deleteAllTasks),
-                onTap: () {
-                  _showConfirmDialog(
-                    context,
-                    loc.clearTasks,
-                    loc.confirmClearTasks,
-                    () {
-                      widget.onClearAll();
-                      Navigator.pop(context);
-                    },
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.archive_outlined),
-                title: Text(loc.clearArchive),
-                subtitle: Text(
-                    '${loc.delete} ${widget.archivedCount} ${loc.archivedTasks}'),
-                enabled: widget.archivedCount > 0,
-                onTap: widget.archivedCount > 0
-                    ? () {
-                        _showConfirmDialog(
-                          context,
-                          loc.clearArchive,
-                          loc.confirmClearArchive,
-                          () {
-                            widget.onClearArchived();
-                            Navigator.pop(context);
-                          },
-                        );
-                      }
-                    : null,
-              ),
-            ],
-          ),
-          const Divider(),
-
-          // Розширені
-          _buildSection(
-            context,
-            loc.advanced,
-            Icons.build,
-            [
-              SwitchListTile(
-                secondary: const Icon(Icons.code),
-                title: Text(loc.developerMode),
-                subtitle: Text(loc.showDebugInfo),
-                value: _developerMode,
-                onChanged: (val) {
-                  setState(() => _developerMode = val);
-                  _saveSetting('developer_mode', val);
-                },
-              ),
-              if (_developerMode) ...[
-                ListTile(
-                  leading: const Icon(Icons.bug_report),
-                  title: const Text('Debug інформація'),
-                  subtitle: Text(
-                      'Flutter ${const String.fromEnvironment('FLUTTER_VERSION', defaultValue: '3.x')}'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.memory),
-                  title: const Text('Кеш'),
-                  subtitle: const Text('Очистити тимчасові дані'),
-                  onTap: () async {
-                    // Clear cache logic here
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Кеш очищено')),
-                    );
-                  },
-                ),
-              ],
-              ListTile(
-                leading: const Icon(Icons.restore, color: Colors.red),
-                title: Text(loc.resetApp,
-                    style: const TextStyle(color: Colors.red)),
-                subtitle: Text(loc.resetAppDesc),
-                onTap: () {
-                  _showConfirmDialog(
-                    context,
-                    loc.resetApp,
-                    'Це видалить всі налаштування та повернеться до заводських. Дані (завдання, звички) збережуться.',
-                    _resetApp,
-                  );
-                },
-              ),
-            ],
-          ),
-          const Divider(),
-
-          // Про додаток
-          _buildSection(
-            context,
-            loc.about,
-            Icons.info,
-            [
-              const ListTile(
-                leading: Icon(Icons.task_alt),
-                title: Text('TaskFlow'),
-                subtitle:
-                    Text('Версія 2.2.0\nВаш персональний менеджер завдань'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.code),
-                title: const Text('Розробник'),
-                subtitle: const Text('Made with Flutter ❤️'),
-                onTap: () {},
-              ),
-              ListTile(
-                leading: const Icon(Icons.privacy_tip),
-                title: const Text('Політика конфіденційності'),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () {},
-              ),
             ],
           ),
           const SizedBox(height: 32),

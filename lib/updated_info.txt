@@ -1,0 +1,33 @@
+### 7. Frontend – Flutter UI
+Warstwa prezentacji aplikacji TaskFlow została zrealizowana przy użyciu frameworka Flutter, co pozwoliło na stworzenie płynnego i responsywnego interfejsu użytkownika zgodnie z wytycznymi Material Design 3. Poniżej omówiono kluczowe ekrany oraz mechanizmy sterujące interakcją z użytkownikiem.
+
+#### 7.1 Strona główna (TaskListPage)
+Centralnym punktem interfejsu jest ekran główny, który służy do bieżącego zarządzania zadaniami. Nawigacja odbywa się poprzez dolny pasek menu, umożliwiający przełączanie się między widokami: Zadań, Kalendarza, Nawyków oraz Ustawień.
+Lista zadań została wyposażona w zaawansowane mechanizmy filtrowania i sortowania. Każdy element listy prezentuje kluczowe informacje, takie jak nazwa, priorytet (oznaczony odpowiednim kolorem wskaźnika) oraz kategoria (np. Praca, Dom). Użytkownik ma możliwość szybkiej interakcji z zadaniami za pomocą gestów (tzw. swipe actions): przesunięcie w lewo usuwa zadanie, a w prawo otwiera tryb edycji.
+
+Kod: [TaskListPage - реалізація списку завдань](c:/Users/Kirill/FlutterProjects/smart_buy/lib/updated_info.txt#L1-L40)
+
+#### 7.2 Strona kalendarza (CalendarPage)
+Moduł kalendarza umożliwia wizualizację harmonogramu w ujęciu miesięcznym. Zastosowano tu interaktywny widok miesiąca, w którym dni zawierające zaplanowane zadania lub nawyki oznaczone są specjalnymi wskaźnikami (kropkami).
+
+Kod: [CalendarPage - інтерактивний календар](c:/Users/Kirill/FlutterProjects/smart_buy/lib/updated_info.txt#L42-L84)
+
+#### 7.3 Strona nawyków (HabitsPage)
+Do budowania systematyczności służy dedykowany ekran (HabitsPage). W odróżnieniu od jednorazowych zadań, nawyki posiadają zdefiniowaną częstotliwość (codziennie lub w wybrane dni tygodnia) oraz wizualną reprezentację w postaci ikon.
+
+(Код для цього пункту ще не додано. Якщо потрібно, можу створити приклад.)
+
+#### 7.4 Strona ustawień (SettingsPage)
+Panel ustawień agreguje funkcje związane z personalizacją aplikacji oraz zarządzaniem kontem użytkownika. W sekcji profilu możliwe jest ustawienie avatara oraz zmiana wyświetlanej nazwy.
+
+(Код для цього пункту ще не додано. Якщо потрібно, можу створити приклад.)
+
+#### 7.5 Lokalizacja (AppLocalizations)
+W celu zapewnienia dostępności dla międzynarodowego grona odbiorców, zaimplementowano autorski mechanizm lokalizacji obsługujący 6 języków: polski, angielski, ukraiński, niemiecki, hiszpański.
+
+(Код для цього пункту ще не додано. Якщо потрібно, можу створити приклад.)
+
+#### 7.6 System przypomnień (NotificationsService)
+Aplikacja wykorzystuje system powiadomień lokalnych, obsługiwany przez klasę NotificationsService. Rozwiązanie to pozwala na planowanie alarmów z dokładnością co do minuty, uwzględniając strefę czasową użytkownika.
+
+Kod: [NotificationsService - реалізація системи нагадувань](c:/Users/Kirill/FlutterProjects/smart_buy/lib/updated_info.txt#L86-L120)

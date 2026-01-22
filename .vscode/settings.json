@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 {
   // When saving files VS Code will automatically request a Flutter hot-reload.
   "dart.flutterHotReloadOnSave": true
 }
+=======
+{}
+>>>>>>> acadc86232f312e0be65dda4f2c086d80dfe0513

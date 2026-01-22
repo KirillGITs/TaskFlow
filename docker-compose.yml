@@ -1,0 +1,97 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: hello_db
+      POSTGRES_USER: hello_user
+      POSTGRES_PASSWORD: hello_pass
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - hello_net
+
+  backend:
+    build: ./backend
+    environment:
+      DB_NAME: hello_db
+      DB_USER: hello_user
+      DB_PASSWORD: hello_pass
+      DB_HOST: db
+      DB_PORT: 5432
+      SELENIUM_URL: http://selenium:4444/wd/hub
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      - db
+    volumes:
+      - ./backend/media:/app/media
+    networks:
+      - hello_net
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    command: ["npm", "start"]
+    environment:
+      - HOST=0.0.0.0
+      - DANGEROUSLY_DISABLE_HOST_CHECK=true
+    stdin_open: true
+    tty: true
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - hello_net
+
+  redis:
+    image: redis:7-alpine
+    networks:
+      - hello_net
+
+  celery_worker:
+    build: ./backend
+    command: celery -A config worker --loglevel=info
+    environment:
+      DB_NAME: hello_db
+      DB_USER: hello_user
+      DB_PASSWORD: hello_pass
+      DB_HOST: db
+      DB_PORT: 5432
+      SELENIUM_URL: http://selenium:4444/wd/hub
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+      - selenium
+    volumes:
+      - ./backend/media:/app/media
+    networks:
+      - hello_net
+
+  selenium:
+    image: selenium/standalone-chrome:115.0
+    ports:
+      - "4444:4444"
+    shm_size: "2g"
+    networks:
+      - hello_net
+
+  nginx:
+    build: ./nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - hello_net
+
+networks:
+  hello_net:
+
+volumes:
+  db_data:

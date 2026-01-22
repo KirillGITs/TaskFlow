@@ -1,0 +1,9 @@
+Django>=4.2
+psycopg2-binary
+selenium==4.11.2
+requests
+beautifulsoup4
+djangorestframework
+django-cors-headers
+celery[redis]
+weasyprint
